@@ -436,6 +436,7 @@ async def game_loop(websocket,queue:asyncio.Queue):
             if event.type == pygame.QUIT:
                 running = False
                 shutdown_event.set()
+                await queue.put({'type':'disconnect'})
             elif pass_button.is_clicked(event):
                 await queue.put({"type": "action", "action": "pass"})
             elif check_button.is_clicked(event):
@@ -448,6 +449,8 @@ async def game_loop(websocket,queue:asyncio.Queue):
 
         screen.fill((0, 100, 0))
         draw_game_state(screen, game_state)
+        draw_buttons(screen, (pass_button,check_button,raise_button))
+        draw_river(screen,game_state.river)
         pass_button.draw(screen)
         check_button.draw(screen)
         raise_button.draw(screen)
@@ -468,7 +471,7 @@ async def main():
     
     queue = asyncio.Queue() # this queue stores all messages to bne sent.
 
-    async with websockets.connect("ws://localhost:8000") as websocket:
+    async with websockets.connect("ws://192.168.178.110:8000") as websocket:
         # Create tasks for Pygame and receiving messages
         pygame_task = asyncio.create_task(game_loop(websocket,queue))
         network_task = asyncio.create_task(handle_networking(websocket,naam,queue))

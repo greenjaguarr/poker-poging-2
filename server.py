@@ -108,6 +108,7 @@ class GameState:
                 speler.stoelnummer = i+1
                 self.is_stoel_bezet[i] = True
                 break
+        print("[CONNECTION]",f'Beshcikbare stoelen {["X" if stoel else "O" for stoel in self.is_stoel_bezet]}')
         self.spelers[client_uuid] = speler
 
     def verwijder_speler(self, client_uuid):
@@ -115,6 +116,8 @@ class GameState:
             stoel = self.spelers[client_uuid].stoelnummer
             self.is_stoel_bezet[stoel-1] = False
             del self.spelers[client_uuid]
+        print("[DISCONNECTION]",f'Beshcikbare stoelen {["X" if stoel else "O" for stoel in self.is_stoel_bezet]}')
+
         
     def volgende_beurt(self):
         uuids = list(self.spelers.keys())
@@ -151,13 +154,14 @@ async def startup_handshake(websocket):
 
     msg = await websocket.recv()
     event:dict = json.loads(msg)
-    if "naam" in event:
-        speler_naam = event["naam"]
+    if "name" in event:
+        speler_naam = event["name"]
     
     else:
     # Voeg een nieuwe speler toe aan de game met een standaardnaam en startcoins
         speler_naam = f"Speler_{len(state.spelers) + 1}"  # Dynamisch gegenereerde naam
         print("Er is iets fout gegaan bij het ontvangen van de naam van deze speler")
+        print("Event is ",event)
     speler_start_coins = 100  # Standaard aantal coins
     nieuwe_speler = Speler(naam=speler_naam, coins=speler_start_coins)
     
@@ -213,8 +217,8 @@ async def handle_message(websocket, client_uuid):
             
 
     finally:
-        async with USERS_LOCK:
-            del USERS[client_uuid]
+        # async with USERS_LOCK:
+        #     del USERS[client_uuid]
         if client_uuid in state.spelers:
             del state.spelers[client_uuid]
         logging.info(f"[INFO] Client {client_uuid} is verbroken.")
@@ -232,8 +236,8 @@ async def network_manager(websocket):
 
 
 async def main():
-    async with serve(network_manager, "localhost", 8000):
-        print("[INFO] Server gestart op ws://localhost:8000")
+    async with serve(network_manager, "192.168.178.110", 8000):
+        print("[INFO] Server gestart op ws://192.168.178.110:8000")
         await asyncio.get_running_loop().create_future()  # Houd de server actief
 
 
