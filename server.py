@@ -41,7 +41,7 @@ class Speler:
 class GameState:
     def __init__(self) -> None:
         self.MAXSPELERS = 8
-        self.spelers = {}  # {client_uuid: speler_object}
+        self.spelers:dict = {}  # {client_uuid: speler_object}
         self.AanDeBerut:int = None # uuid of player whos turn it is
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
 
@@ -60,6 +60,7 @@ class GameState:
                 ],
                 "isAanDeBeurt": speler.is_AanDeBeurt,
                 "isGepast": speler.is_Gepast,
+                "stoelnummer": speler.stoelnummer
             }
         return json.dumps({
             "type": "gamestate",
