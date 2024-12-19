@@ -41,8 +41,14 @@ class Speler:
         self.is_Gepast: bool = False
         self.stoelnummer:int
         self.current_bet:int
+        self.mostrecentaction = None
+
+    async def wait_for_action(self):
+        await self.action_event.wait()  # Wait for the player to take action
+        self.action_event.clear()  # Reset the event for the next round
 
 class GameState:
+    SUIT_SYMBOLS = {"harten": "♥", "ruiten": "♦", "klaveren": "♣", "schoppen": "♠"}
     def __init__(self) -> None:
         self.MAXSPELERS = 8
         self.spelers:dict = {}  # {client_uuid: speler_object}
@@ -90,18 +96,17 @@ class GameState:
         # update the gamestate, for example if the action is pass, then set the next player's is_AanDeBeurt to True. 
         logging.info(f"Speler {client_uuid} heeft actie: {event['action']} uitgevoerd.")
         if event["action"] == "pass":
-            self.spelers[client_uuid].is_Gepast = True
-            self.volgende_beurt()
+            self.spelers[client_uuid].mostrecentaction = {"action":'pass'}
         elif event["action"] == "check":
-            # Voeg logica toe voor check
-            self.volgende_beurt()
+            self.spelers[client_uuid].mostrecentaction = {"action":'check'}
         elif event["action"] == "raise":
-            bedrag = event.get("amount", 0)
-            self.spelers[client_uuid].coins -= bedrag
-            # Voeg raise-logica toe
-            self.volgende_beurt()
+            bedrag:int = event.get("amount")
+            if bedrag is None: return
+            self.spelers[client_uuid].mostrecentaction = {"action":'raise', 'amount': bedrag}
         else:
             raise ValueError("Onbekende actie")
+        # Signal that the player has made their move
+        self.spelers[client_uuid].action_event.set()
 
 
 
@@ -138,7 +143,7 @@ class GameState:
         return l
 
         
-    def deel_kaarten(self,deler:int):
+    def deel_kaarten(self):
         for uuid, speler in self.spelers.items():
             speler.hand = [self.kaarten.pop(), self.kaarten.pop()]
 
@@ -160,15 +165,60 @@ class GameState:
         next_player = next(iterator)
         self.bet(next_player,2)
 
-    def bied_fase(self,iterator):
-        next_player = next(iterator)
+    async def bied_fase(self, iterator):
+        """Verwerkt de biedronde waar elke speler kan passen, checken of raisen."""
         self.round_state = "biedfase"
-        while 
+        self.current_bet = 0  # Start met een inzet van 0
+        self.highest_bet = 0  # De hoogste inzet start op 0
+        actieve_spelers = self.actieve_spelers()  # Alle actieve spelers (niet gepast)
 
-        self.round_state = ""
-        
+        # Alle actieve spelers krijgen om beurten de kans om te handelen.
+        while True:
+            speler_uuid = next(iterator)
+            speler = self.spelers[speler_uuid]
+            print(speler.naam, ' is aan de beurt' )
+
+            if speler.is_Gepast:
+                continue  # Sla spelers over die gepast hebben
+
+            await speler.wait_for_action()
+
+            # # Wacht op de actie van de speler
+            # if speler.mostrecentaction is None:  # Als de speler nog niets heeft gedaan
+            #     continue  # Wacht op actie
+
+            actie = speler.mostrecentaction["action"]
+            if actie == "pass":
+                speler.is_Gepast = True  # Markeer de speler als gepast
+                logging.info(f"Speler {speler.naam} heeft gepast.")
+            elif actie == "check":
+                # Check of de speler de huidige inzet gelijk houdt
+                if speler.current_bet < self.highest_bet:
+                    # Als de inzet niet gelijk is, moet de speler de juiste hoeveelheid betalen
+                    ontbrekend_bedrag = self.highest_bet - speler.current_bet
+                    self.bet(speler_uuid, ontbrekend_bedrag)
+                logging.info(f"Speler {speler.naam} heeft gecheckt.")
+            elif actie == "raise":
+                # Als de speler raise, verhogen we de inzet
+                bedrag = speler.mostrecentaction.get("amount", 0)
+                if bedrag <= self.highest_bet:
+                    logging.warning(f"Speler {speler.naam} probeert te raisen met een bedrag dat lager is dan de hoogste inzet.")
+                    continue  # We negeren dit, omdat het minder is dan de hoogste bet
+
+                self.highest_bet = bedrag  # Update de hoogste inzet
+                self.bet(speler_uuid, bedrag - speler.current_bet)  # Betale het verschil
+                logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
+
+            # Controleer of de biedronde klaar is (alle spelers hebben dezelfde inzet of gepast)
+            if all(speler.current_bet == self.highest_bet or speler.is_Gepast for speler in self.spelers.values()):
+                break  # Einde biedronde
+
+        self.round_state = "fase_einde"
+        logging.info("Biedronde is geëindigd.")
+
+            
     
-    def doe_1_ronde(self,deler_uuid):
+    async def doe_1_ronde(self,deler_uuid):
         """Execute one full poker round."""
 
         # SETUP
@@ -195,48 +245,20 @@ class GameState:
         # BEGIN
 
         self.eerste_fase(iterator)
-        self.bied_fase()
+        await self.bied_fase()
         self.river[0] = self.kaarten.pop()
         self.river[1] = self.kaarten.pop()
         self.river[2] = self.kaarten.pop()
-        self.bied_fase()
+        await self.bied_fase()
         self.river[3] = self.kaarten.pop()
-        self.bied_fase()
+        await self.bied_fase()
         self.river[4] = self.kaarten.pop()
-        self.bied_fase()
+        await self.bied_fase()
         self.bepaal_winnaar()
-
-    # def doe_1_complete_ronde(self,deler:int):
-    #     # reset kaarten
-    #     self.river = [None,None,None,None,None] # None represents the lack of a card.
-    #     for uuid, speler in self.spelers.items():
-    #         speler.hand = [None,None]
-    #     # schud kaarten
-    #     self.kaarten = [Kaart(kleur, waarde) for kleur in self.SUIT_SYMBOLS.keys() for waarde in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "B", "V" "K"]]
-    #     random.shuffle(self.kaarten)
-    #     self.deel_kaarten()
-
-    #     # phase 1: de blinds ( geen inputs)
-
-    #     # phase 2: 0 river kaarten
-
-    #     # phase 3: 3 river kaarten
-    #     self.river[0] = self.kaarten.pop()
-    #     self.river[1] = self.kaarten.pop()
-    #     self.river[2] = self.kaarten.pop()
-
-    #     # phase 4: 4 river kaarten
-    #     self.river[3] = self.kaarten.pop()
-
-    #     # phase 5: 5 river kaarten
-    #     self.river[4] = self.kaarten.pop()
 
     #     # Check for winner
     #     # made by a friend
     #     # hand out coins
-
-
-
 
 
 
@@ -246,19 +268,25 @@ async def game_loop():
     """
     Periodieke taken voor de game, zoals het bijwerken van de staat.
     """
-    await asyncio.sleep(15)
-    print("De game begint")
+    await asyncio.sleep(3)
     deler = 7
 
+    while len(state.spelers) < 2:
+        await asyncio.sleep(3)
+        print("not enough players")
+    print("De game begint")
+
+
     while True:
-        def advance_deler():
+        def advance_deler(deler):
             bezette_stoelen = state.bezette_stoelen()
             deler = deler%8
             deler+=1
             while not deler in bezette_stoelen:
                 deler = deler%8
                 deler+=1
-        deler = advance_deler()
+            return deler
+        deler = advance_deler(deler)
         deler_uuid = None
         for uuid,speler in state.spelers.items():
             if speler.stoelnummer == deler:
@@ -268,7 +296,7 @@ async def game_loop():
 
         print("[GAME] Game loopt. Bezig met state updates...", "Nieuwe ronde begint")
         # TODO: Voeg hier logica toe voor het beheren van rondes, inzetten, enz.
-        state.doe_1_ronde(deler)
+        await state.doe_1_ronde(deler)
 
 
 
@@ -327,6 +355,8 @@ async def handle_message(websocket, client_uuid):
                 continue
             # Verwerk acties
             elif event["type"] == "action":
+                if not state.spelers[client_uuid].isAanDeBeurt:
+                    continue
                 try:
                     state.handle_client_input(event, client_uuid)
                 except ValueError as e:
