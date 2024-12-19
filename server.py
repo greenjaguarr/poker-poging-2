@@ -7,6 +7,7 @@ import uuid
 from websockets.asyncio.server import broadcast, serve
 # import websockets
 import random
+from itertools import cycle
 
 logging.basicConfig()
 
@@ -39,6 +40,7 @@ class Speler:
         self.is_AanDeBeurt: bool = False
         self.is_Gepast: bool = False
         self.stoelnummer:int
+        self.current_bet:int
 
 class GameState:
     def __init__(self) -> None:
@@ -47,6 +49,9 @@ class GameState:
         self.AanDeBerut:str = None # uuid of player whos turn it is # of stoelnummer?
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
         self.is_stoel_bezet = [False,False,False,False,False,False,False,False]
+        self.pot = 0       # Total coins in the pot
+        self.current_bet = 0  # Current highest bet
+        self.round_state = ""  # Describes the current phase of the game
 
     def create_state_message(self, target_uuid) -> str:
         """
@@ -118,34 +123,120 @@ class GameState:
             del self.spelers[client_uuid]
         print("[DISCONNECTION]",f'Beshcikbare stoelen {["X" if stoel else "O" for stoel in self.is_stoel_bezet]}')
 
+    def bezette_stoelen(self):
+        l = []
+        for i,stoel in enumerate(self.is_stoel_bezet):
+            if stoel:
+                l.append(i+1)
+        return l
+    
+    def actieve_spelers(self):
+        l = []
+        for uuid,speler in self.spelers.items():
+            if not speler.is_Gepast:
+                l.append(uuid)
+        return l
+
         
-    def volgende_beurt(self):
-        uuids = list(self.spelers.keys())
-        # huidige_index = uuids.index(self.AanDeBerut)
-        # self.AanDeBerut = uuids[(huidige_index + 1) % len(uuids)]
-        stoelnummers_bij = [speler.stoelnummer if not speler.is_Gepast else _ for _,speler in self.spelers.items()]
-        if len(stoelnummers_bij) <=1:
-            # what
-            pass
-
-
-    def schud_kaarten(self):
-        # take all of the cards away from all players and the river.
-        self.river = [None,None,None,None,None] # None represents the lack of a card.
-        for uuid, speler in self.spelers.items():
-            speler.hand = [None,None]
-            self.kaarten = [Kaart(kleur, waarde) for kleur in self.SUIT_SYMBOLS.keys() for waarde in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "B", "V" "K"]]
-        random.shuffle(self.kaarten)
-
-    def deel_kaarten(self):
+    def deel_kaarten(self,deler:int):
         for uuid, speler in self.spelers.items():
             speler.hand = [self.kaarten.pop(), self.kaarten.pop()]
 
-    def doe_1_complete_ronde(self):
-        # reset kaarten
-        self.schud_kaarten()
-        self.deel_kaarten()
+
+    def bet(self,player_uuid:str,amount:int)->None:
+        player = self.spelers[player_uuid]
+        self.pot+=amount
+        player.coins+=-amount
+        player.current_bet+=amount
+        if player.current_bet > self.highest_bet:
+            self.highest_bet = player.current_bet
+
+
+    def eerste_fase(self,iterator):
+        """Handle the initial blinds phase."""
+        self.round_state = "eerste_fase"
+        next_player = next(iterator)
+        self.bet(next_player,1)
+        next_player = next(iterator)
+        self.bet(next_player,2)
+
+    def bied_fase(self,iterator):
+        next_player = next(iterator)
+        self.round_state = "biedfase"
+        while 
+
+        self.round_state = ""
         
+    
+    def doe_1_ronde(self,deler_uuid):
+        """Execute one full poker round."""
+
+        # SETUP
+
+        self.pot = 0
+        for _,speler in self.spelers.items():
+            speler.current_bet = 0
+    
+        # reset kaarten
+        self.river = [None,None,None,None,None] # None represents the lack of a card.
+        for uuid, speler in self.spelers.items():
+            speler.hand = [None,None]
+        # schud kaarten
+        self.kaarten = [Kaart(kleur, waarde) for kleur in self.SUIT_SYMBOLS.keys() for waarde in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "B", "V" "K"]]
+        random.shuffle(self.kaarten)
+        self.deel_kaarten()
+
+        actieve_spelers:list[str] = self.spelers.keys()
+        # turn it into an iterator that can loop
+        iterator = cycle(actieve_spelers)
+        while next(iterator) != deler_uuid:
+            continue
+
+        # BEGIN
+
+        self.eerste_fase(iterator)
+        self.bied_fase()
+        self.river[0] = self.kaarten.pop()
+        self.river[1] = self.kaarten.pop()
+        self.river[2] = self.kaarten.pop()
+        self.bied_fase()
+        self.river[3] = self.kaarten.pop()
+        self.bied_fase()
+        self.river[4] = self.kaarten.pop()
+        self.bied_fase()
+        self.bepaal_winnaar()
+
+    # def doe_1_complete_ronde(self,deler:int):
+    #     # reset kaarten
+    #     self.river = [None,None,None,None,None] # None represents the lack of a card.
+    #     for uuid, speler in self.spelers.items():
+    #         speler.hand = [None,None]
+    #     # schud kaarten
+    #     self.kaarten = [Kaart(kleur, waarde) for kleur in self.SUIT_SYMBOLS.keys() for waarde in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "B", "V" "K"]]
+    #     random.shuffle(self.kaarten)
+    #     self.deel_kaarten()
+
+    #     # phase 1: de blinds ( geen inputs)
+
+    #     # phase 2: 0 river kaarten
+
+    #     # phase 3: 3 river kaarten
+    #     self.river[0] = self.kaarten.pop()
+    #     self.river[1] = self.kaarten.pop()
+    #     self.river[2] = self.kaarten.pop()
+
+    #     # phase 4: 4 river kaarten
+    #     self.river[3] = self.kaarten.pop()
+
+    #     # phase 5: 5 river kaarten
+    #     self.river[4] = self.kaarten.pop()
+
+    #     # Check for winner
+    #     # made by a friend
+    #     # hand out coins
+
+
+
 
 
 
@@ -157,17 +248,27 @@ async def game_loop():
     """
     await asyncio.sleep(15)
     print("De game begint")
-    while True:
-        # # Check of de game nog loopt (bijvoorbeeld een stop-voorwaarde)
-        # if len(state.spelers) < 2:
-        #     print("[GAME] Wachten op meer spelers...")
-        #     await asyncio.sleep(1)  # Wacht even voordat je opnieuw controleert
-        #     continue
+    deler = 7
 
-        # Update game state (bijvoorbeeld het starten van een nieuwe ronde)
+    while True:
+        def advance_deler():
+            bezette_stoelen = state.bezette_stoelen()
+            deler = deler%8
+            deler+=1
+            while not deler in bezette_stoelen:
+                deler = deler%8
+                deler+=1
+        deler = advance_deler()
+        deler_uuid = None
+        for uuid,speler in state.spelers.items():
+            if speler.stoelnummer == deler:
+                deler_uuid = uuid
+        if deler_uuid == None:
+            exit() # rip
+
         print("[GAME] Game loopt. Bezig met state updates...", "Nieuwe ronde begint")
         # TODO: Voeg hier logica toe voor het beheren van rondes, inzetten, enz.
-        state.doe_1_complete_ronde()
+        state.doe_1_ronde(deler)
 
 
 
