@@ -42,7 +42,7 @@ class GameState:
     def __init__(self) -> None:
         self.MAXSPELERS = 8
         self.spelers:dict = {}  # {client_uuid: speler_object}
-        self.AanDeBerut:int = None # uuid of player whos turn it is
+        self.AanDeBerut:str = None # uuid of player whos turn it is
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
 
     def create_state_message(self, target_uuid) -> str:
@@ -51,7 +51,11 @@ class GameState:
         """
         spelers_data = {}
         for uuid, speler in self.spelers.items():
-            spelers_data[uuid] = {
+            # spelers_data[uuid] = {
+            if speler.stoelnummer in spelers_data:
+                raise ValueError(f"Duplicate stoelnummer detected: {speler.stoelnummer}")
+            
+            spelers_data[speler.stoelnummer] = {
                 "naam": speler.naam,
                 "coins": speler.coins,
                 "hand": [

@@ -23,6 +23,10 @@ class Kaart:
         self.kleur = kleur
         self.waarde = waarde
 
+    def __str__(self):
+        # lmao waarom niet
+        return f"{self.waarde}{self.SUIT_SYMBOLS[self.kleur]}"
+
     def draw(self, screen, x, y, liggend=False, dicht=False):
         """
         Tekent een kaart op het scherm.
@@ -133,40 +137,53 @@ def draw_buttons(screen:pygame.Surface,buttons:tuple[Button]):
         button.draw(screen)
 
 class Speler:
-    def __init__(self, naam, coins, kaart1, kaart2, kaart1_dicht=True, kaart2_dicht=True):
+    def __init__(self, naam: str, coins: int, hand: list[tuple[Kaart, bool]] = None):
+        """
+        Parameters:
+        - naam: Name of the player.
+        - coins: The number of coins the player has.
+        - hand: A list of tuples, each containing a Kaart instance and a boolean for face-down status.
+        """
         self.naam: str = naam
         self.coins: int = coins
-        self.hand: list[tuple[Kaart, bool]] = [
-            (kaart1, kaart1_dicht),
-            (kaart2, kaart2_dicht)
-        ]
+        self.hand: list[tuple[Kaart, bool]] = hand or []
         self.is_AanDeBeurt: bool = False
         self.is_Gepast: bool = False
 
-class GameState:
-    def __init__(self):
-        self.players = [
-            Speler("Speler1", 500, Kaart("harten", "A"), Kaart("schoppen", "K"), kaart1_dicht=False, kaart2_dicht=True),
-            Speler("Speler2", 400, Kaart("ruiten", "5"), Kaart("klaveren", "7"), kaart1_dicht=True, kaart2_dicht=True),
-            Speler("Speler3", 300, Kaart("harten", "3"), Kaart("klaveren", "4"), kaart1_dicht=False, kaart2_dicht=False),
-            Speler("Speler4", 450, Kaart("schoppen", "9"), Kaart("harten", "2"), kaart1_dicht=True, kaart2_dicht=True),
-            Speler("Speler5", 350, Kaart("ruiten", "K"), Kaart("klaveren", "5"), kaart1_dicht=False, kaart2_dicht=False),
-            Speler("Speler6", 600, Kaart("klaveren", "J"), Kaart("harten", "7"), kaart1_dicht=True, kaart2_dicht=False),
-        ]
-        self.river = [
-            Kaart("harten", "A"),
-            Kaart("schoppen", "10"),
-            Kaart("klaveren", "2"),
-            Kaart("ruiten", "V"),
-            None  # Lege plek voor een mogelijke kaart
-        ]
+# class GameState:
+#     def __init__(self):
+#         self.players = [
+#             Speler("Speler1", 500, Kaart("harten", "A"), Kaart("schoppen", "K"), kaart1_dicht=False, kaart2_dicht=True),
+#             Speler("Speler2", 400, Kaart("ruiten", "5"), Kaart("klaveren", "7"), kaart1_dicht=True, kaart2_dicht=True),
+#             Speler("Speler3", 300, Kaart("harten", "3"), Kaart("klaveren", "4"), kaart1_dicht=False, kaart2_dicht=False),
+#             Speler("Speler4", 450, Kaart("schoppen", "9"), Kaart("harten", "2"), kaart1_dicht=True, kaart2_dicht=True),
+#             Speler("Speler5", 350, Kaart("ruiten", "K"), Kaart("klaveren", "5"), kaart1_dicht=False, kaart2_dicht=False),
+#             Speler("Speler6", 600, Kaart("klaveren", "J"), Kaart("harten", "7"), kaart1_dicht=True, kaart2_dicht=False),
+#         ]
+#         self.river = [
+#             Kaart("harten", "A"),
+#             Kaart("schoppen", "10"),
+#             Kaart("klaveren", "2"),
+#             Kaart("ruiten", "V"),
+#             None  # Lege plek voor een mogelijke kaart
+#         ]
 
+class GameState:
+    def __init__(self) -> None:
+        self.MAXSPELERS = 8
+        self.stoelen:dict = {}  # {stoelnummer: speler_object}
+        self.AanDeBerut:str = None # uuid of player whos turn it is
+        self.river = [None, None, None, None, None] # List of cards in river. None represents no card
+
+STATE_LOCK = asyncio.Lock()
+global state
+state = GameState()
 
 
 # Networking
 async def startup_handshake(websocket:websockets.asyncio.connection.Connection,naam:str)->str:
     websocket.send(json.dumps({"type": "connect", "name":naam}))
-    asyncio.sleep(1)
+    await asyncio.sleep(1)
     msg = await websocket.recv()
     event:dict = json.loads(msg)
     if not "type" in event:
@@ -186,22 +203,62 @@ async def startup_handshake(websocket:websockets.asyncio.connection.Connection,n
 
 async def read_messages(websocket)->None:
     '''This function reads the incoming messages. It modifies the gamestate'''
+    global state
     async for message in websocket:
+        await asyncio.sleep(0.01)
         event:dict = json.loads(message)
+        if not "type" in event:  continue
+        if event["type"] == 'gamestate':
+            print(f"received gamestate update")
+            nieuwe_state = GameState()
+            # download gamestate
+            nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
+            nieuwe_state.river = [
+                {"kleur": kaart["kleur"], "waarde": kaart["waarde"]} if kaart else None
+                for kaart in event["river"]
+            ]
+            nieuwe_state.spelersdata = event["spelers"]
+            # state.stoelen = {stoelnummer: Speler(naam=spelerdict["naam"],coins=spelerdict['coins'],*[Kaart(kaart.kleur,kaart.waarde) if kaart else None for kaart in spelerdict['hand']]) for stoelnummer, spelerdict in state.spelersdata.items()}
+            nieuwe_state.stoelen = {}
+            for stoelnummer, spelerdict in nieuwe_state.spelersdata.items():
+                hand = []
+                for kaart in spelerdict["hand"]:
+                    if kaart:
+                        hand.append(Kaart(kaart["kleur"], kaart["waarde"]))
+                    else:
+                        hand.append(None)
+                speler = Speler(
+                    naam=spelerdict["naam"],
+                    coins=spelerdict["coins"],
+                    hand=hand
+                )
+                speler.is_AanDeBeurt = spelerdict["isAanDeBeurt"]
+                speler.is_Gepast = spelerdict["isGepast"]
+                nieuwe_state.stoelen[stoelnummer] = speler
+            async with STATE_LOCK:
+                state = nieuwe_state
+
+        elif event["type"] == 'info':
+            print(event['message'])
+        elif event['type'] == 'error':
+            print(event['message'])
+        else:
+            print(f"received event of type {event["type"]} which is not supported")
         pass # handle messages
 
 # Function to handle sending messages from the queue
 async def send_messages(websocket, queue)->None:
     while True:
-        # Wait for a message to be available in the queue
-        message = await queue.get()
-        
-        # Send the message over the websocket
-        await websocket.send(message)
-        # print(f"Sent message: {message}")
-        
-        # Mark the task as done
-        queue.task_done()
+        try:
+            message = await queue.get()
+            await websocket.send(message)
+            queue.task_done()
+        except websockets.ConnectionClosed:
+            print("Connection to server lost.")
+            break
+        except Exception as e:
+            print(f"Error sending message: {e}")
+
     
 async def handle_networking(websocket:websockets.asyncio.connection.Connection,naam:str,queue:asyncio.Queue):
     client_uuid:str = await startup_handshake(websocket,naam)
@@ -216,7 +273,7 @@ async def handle_networking(websocket:websockets.asyncio.connection.Connection,n
 
 
 # Main game loop
-async def main_pygame(websocket,queue:asyncio.Queue):
+async def game_loop(websocket,queue:asyncio.Queue):
     pygame.init()
     screen = pygame.display.set_mode((800, 800))
     pygame.display.set_caption("Poker Tafel")
@@ -226,16 +283,14 @@ async def main_pygame(websocket,queue:asyncio.Queue):
     BLUE = (0, 0, 255)
     LIGHTBLUE = (173, 216, 230)
 
-
-    # GameState aanmaken
-    game_state = GameState()
-
     pass_button = Button(50,600,200,150,"Pass",font,BLUE,LIGHTBLUE,BLACK)
     check_button = Button(300,600,200,150,"Check",font,BLUE,LIGHTBLUE,BLACK)
     raise_button = Button(550,600,200,150,"Raise",font,BLUE,LIGHTBLUE,BLACK)
 
     running = True
     while running:
+        async with STATE_LOCK:
+            game_state = state
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -263,7 +318,7 @@ async def main_pygame(websocket,queue:asyncio.Queue):
         draw_buttons(screen,(pass_button,check_button,raise_button))
         # Update het scherm
         pygame.display.flip()
-        asyncio.sleep(0)
+        await asyncio.sleep(0)
         clock.tick(30)
 
 
@@ -276,15 +331,15 @@ async def main_pygame(websocket,queue:asyncio.Queue):
 
 async def main():
     naam:str = input("Wat is jouw naam? Maximaal 10 characters")[:10]
-    if ["'",'"',',','.','\\','/'] in naam:
-        print("feut")
+    if any(c in naam for c in ["'", '"', ",", ".", "\\", "/"]):
+        print("Ongeldige karakters in naam.")
         exit()
     
     queue = asyncio.Queue() # this queue stores all messages to bne sent.
 
     async with websockets.connect("ws://localhost:8000") as websocket:
         # Create tasks for Pygame and receiving messages
-        pygame_task = asyncio.create_task(main_pygame(websocket,queue))
+        pygame_task = asyncio.create_task(game_loop(websocket,queue))
         network_task = asyncio.create_task(handle_networking(websocket,naam,queue))
 
         # Run both tasks concurrently
