@@ -1,3 +1,4 @@
+from itertools import combinations
 
 class Kaart:
     SUIT_SYMBOLS = {"harten": "♥", "ruiten": "♦", "klaveren": "♣", "schoppen": "♠"}
@@ -51,9 +52,36 @@ def calc_waarde(kaarten:list[Kaart]):
         
         handresult.append(["flush", waardes_in_flush])
 
-    # checking for straigth
-    straight_test_list = kaartwaardefrequentie.keys()
-    print(straight_test_list)
+    # Function to determine if hand contains a straight
+    def highest_straight(hand):
+        # Define card values (mapping face cards and ace)
+        card_values = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'T': 10, 'B': 11, 'V': 12, 'K': 13, 'A': 14}
+        
+        # Extract the ranks from the hand (ignoring the suits)
+        values = [card_values[card.value] for card in hand]
+
+        # Function to check for the highest straight from the list of values
+        def find_highest_straight(values):
+            values = sorted(set(values))  # Remove duplicates and sort
+            highest_straight = None
+            
+            # Check all combinations of 5 cards from the 7 cards
+            for combo in combinations(values, 5):
+                # Check if the combo forms a straight (consecutive cards)
+                if all(combo[i] == combo[i-1] + 1 for i in range(1, len(combo))):
+                    # Keep track of the highest straight (based on the highest card in the straight)
+                    if highest_straight is None or combo[-1] > highest_straight[-1]:
+                        highest_straight = combo
+            return highest_straight
+        
+        # First, try Ace as high (A = 14)
+        highest_straight_high = find_highest_straight(values)
+
+        # Now, try Ace as low (A = 1) by replacing all Aces (14) with 1
+        values_as_low = [1 if value == 14 else value for value in values]
+        highest_straight_low = find_highest_straight(values_as_low)
+
+        return highest_straight_high or highest_straight_low
 
     # checking for quads
     if max(kaartwaardefrequentie_list) == 4:
