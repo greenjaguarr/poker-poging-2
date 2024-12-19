@@ -44,7 +44,7 @@ class GameState:
     def __init__(self) -> None:
         self.MAXSPELERS = 8
         self.spelers:dict = {}  # {client_uuid: speler_object}
-        self.AanDeBerut:str = None # uuid of player whos turn it is
+        self.AanDeBerut:str = None # uuid of player whos turn it is # of stoelnummer?
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
         self.is_stoel_bezet = [False,False,False,False,False,False,False,False]
 
@@ -121,8 +121,12 @@ class GameState:
         
     def volgende_beurt(self):
         uuids = list(self.spelers.keys())
-        huidige_index = uuids.index(self.AanDeBerut)
-        self.AanDeBerut = uuids[(huidige_index + 1) % len(uuids)]
+        # huidige_index = uuids.index(self.AanDeBerut)
+        # self.AanDeBerut = uuids[(huidige_index + 1) % len(uuids)]
+        stoelnummers_bij = [speler.stoelnummer if not speler.is_Gepast else _ for _,speler in self.spelers.items()]
+        if len(stoelnummers_bij) <=1:
+            # what
+            pass
 
 
     def schud_kaarten(self):
@@ -137,9 +141,35 @@ class GameState:
         for uuid, speler in self.spelers.items():
             speler.hand = [self.kaarten.pop(), self.kaarten.pop()]
 
+    def doe_1_complete_ronde(self):
+        # reset kaarten
+        self.schud_kaarten()
+        self.deel_kaarten()
+        
+
 
 
 state = GameState()
+
+async def game_loop():
+    """
+    Periodieke taken voor de game, zoals het bijwerken van de staat.
+    """
+    await asyncio.sleep(15)
+    print("De game begint")
+    while True:
+        # # Check of de game nog loopt (bijvoorbeeld een stop-voorwaarde)
+        # if len(state.spelers) < 2:
+        #     print("[GAME] Wachten op meer spelers...")
+        #     await asyncio.sleep(1)  # Wacht even voordat je opnieuw controleert
+        #     continue
+
+        # Update game state (bijvoorbeeld het starten van een nieuwe ronde)
+        print("[GAME] Game loopt. Bezig met state updates...", "Nieuwe ronde begint")
+        # TODO: Voeg hier logica toe voor het beheren van rondes, inzetten, enz.
+        state.doe_1_complete_ronde()
+
+
 
 
 async def startup_handshake(websocket):
@@ -236,9 +266,12 @@ async def network_manager(websocket):
 
 
 async def main():
-    async with serve(network_manager, "192.168.178.110", 8000):
-        print("[INFO] Server gestart op ws://192.168.178.110:8000")
-        await asyncio.get_running_loop().create_future()  # Houd de server actief
+    game_task = asyncio.create_task(game_loop())  # Start de game loop
+    server_task = serve(network_manager, "192.168.178.110", 8000)  # WebSocket server
+
+    print("[INFO] Server gestart op ws://192.168.178.110:8000")
+    await asyncio.gather(game_task, server_task)  # Voer beide taken parallel uit
+
 
 
 if __name__ == "__main__":
