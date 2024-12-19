@@ -51,6 +51,10 @@ def calc_waarde(kaarten:list[Kaart]):
         
         handresult.append(["flush", waardes_in_flush])
 
+    # checking for straigth
+    straight_test_list = kaartwaardefrequentie.keys()
+    print(straight_test_list)
+
     # checking for quads
     if max(kaartwaardefrequentie_list) == 4:
         for kaart in kaarten: 
@@ -87,7 +91,8 @@ def calc_waarde(kaarten:list[Kaart]):
 
             kaartwaardefrequentie.pop(waarde_van_pair)
             kaartwaardefrequentie_list.remove(2)
-        
+  
+
 
     print(handresult)
 
