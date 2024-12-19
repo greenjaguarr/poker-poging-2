@@ -4,12 +4,22 @@ import json
 import websockets.asyncio.connection
 
 
+pygame.init()
+screen = pygame.display.set_mode((800, 800))
+pygame.display.set_caption("Poker Tafel")
+clock = pygame.time.Clock()
+
+
 # Kleur-definities
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 CARD_COLOR = (240, 240, 240)  # Kleur van kaarten
 FONT_COLOR = (0, 0, 0)
 TABLE_GREEN = (0, 100, 0)
+font = pygame.font.Font(None, 36)
+BLUE = (0, 0, 255)
+LIGHTBLUE = (173, 216, 230)
+GREY = (150,150,150)
 
 # Kaart Class
 class Kaart:
@@ -108,16 +118,22 @@ def draw_game_state(screen, game_state):
 
     font = pygame.font.SysFont("arial", 28)
 
-    for i, speler in enumerate(game_state.players):
-        row = i % 4
-        col = i // 4
+    for stoelnummer, speler in game_state.stoelen.items():
+        row = (stoelnummer-1) % 4
+        col = (stoelnummer-1) // 4
 
         # Posities bepalen
         x = start_x + col * horizontal_spacing * 2
         y = start_y + row * vertical_spacing
 
         # Spelervak tekenen
-        pygame.draw.rect(screen, WHITE, (x, y, 150, 90))
+        if speler.is_Gepast:
+            color = GREY
+        elif speler.is_AanDeBeurt:
+            color = LIGHTBLUE
+        else:
+            color = WHITE
+        pygame.draw.rect(screen, color, (x, y, 150, 90))
         pygame.draw.rect(screen, BLACK, (x, y, 150, 90), 2)
 
         # Naam en coins weergeven
@@ -179,79 +195,167 @@ STATE_LOCK = asyncio.Lock()
 global state
 state = GameState()
 
+shutdown_event = asyncio.Event()
 
 # Networking
-async def startup_handshake(websocket:websockets.asyncio.connection.Connection,naam:str)->str:
-    websocket.send(json.dumps({"type": "connect", "name":naam}))
-    await asyncio.sleep(1)
-    msg = await websocket.recv()
-    event:dict = json.loads(msg)
-    if not "type" in event:
-        raise RuntimeError
-    if event["type"] == 'error':
-        errormessage = event['message']
-        print(errormessage)
-        exit() # boeie
+# async def startup_handshake(websocket:websockets.asyncio.connection.Connection,naam:str)->str:
+#     print('[DEBUG] startup handshake client side started')
+#     await websocket.send(json.dumps({"type": "connect", "name":naam}))
+#     await asyncio.sleep(1)
+#     msg = await websocket.recv()
+#     event:dict = json.loads(msg)
+#     if not "type" in event:
+#         raise RuntimeError
+#     if event["type"] == 'error':
+#         errormessage = event['message']
+#         print(errormessage)
+#         exit() # boeie
 
-    elif event["type"] == 'register':
-        my_uuid:str = event['uuid']
-    else:
-        print("huh")
+#     elif event["type"] == 'register':
+#         my_uuid:str = event['uuid']
+#     else:
+#         print("huh")
+#         exit()
+#     print('[DEBUG] startup handshake client side finished')
+#     return my_uuid
+
+async def startup_handshake(websocket: websockets.asyncio.connection.Connection, naam: str) -> str:
+    print('[DEBUG] startup handshake client side started')
+    try:
+        await websocket.send(json.dumps({"type": "connect", "name": naam}))
+        await asyncio.sleep(1)
+        msg = await websocket.recv()
+        event: dict = json.loads(msg)
+        if not "type" in event:
+            raise RuntimeError("Invalid message received during handshake")
+        if event["type"] == 'error':
+            errormessage = event['message']
+            print(f"[ERROR] {errormessage}")
+            exit()
+        elif event["type"] == 'register':
+            my_uuid: str = event['uuid']
+        else:
+            print("[ERROR] Unexpected message type during handshake.")
+            exit()
+    except websockets.exceptions.ConnectionClosedError as e:
+        print(f"[ERROR] Connection closed unexpectedly during handshake: {e}")
         exit()
-
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] Failed to decode JSON during handshake: {e}")
+        exit()
+    except Exception as e:
+        print(f"[ERROR] Unexpected error during handshake: {e}")
+        exit()
+    
+    print('[DEBUG] startup handshake client side finished')
     return my_uuid
 
-async def read_messages(websocket)->None:
+
+async def read_messages(websocket,client_uuid)->None:
     '''This function reads the incoming messages. It modifies the gamestate'''
     global state
     async for message in websocket:
+        if shutdown_event.is_set():
+            break  # Stop de lus als het shutdown-event is ingesteld
         await asyncio.sleep(0.01)
-        event:dict = json.loads(message)
-        if not "type" in event:  continue
-        if event["type"] == 'gamestate':
-            print(f"received gamestate update")
-            nieuwe_state = GameState()
-            # download gamestate
-            nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
-            nieuwe_state.river = [
-                {"kleur": kaart["kleur"], "waarde": kaart["waarde"]} if kaart else None
-                for kaart in event["river"]
-            ]
-            nieuwe_state.spelersdata = event["spelers"]
-            # state.stoelen = {stoelnummer: Speler(naam=spelerdict["naam"],coins=spelerdict['coins'],*[Kaart(kaart.kleur,kaart.waarde) if kaart else None for kaart in spelerdict['hand']]) for stoelnummer, spelerdict in state.spelersdata.items()}
-            nieuwe_state.stoelen = {}
-            for stoelnummer, spelerdict in nieuwe_state.spelersdata.items():
-                hand = []
-                for kaart in spelerdict["hand"]:
-                    if kaart:
-                        hand.append(Kaart(kaart["kleur"], kaart["waarde"]))
-                    else:
-                        hand.append(None)
-                speler = Speler(
-                    naam=spelerdict["naam"],
-                    coins=spelerdict["coins"],
-                    hand=hand
-                )
-                speler.is_AanDeBeurt = spelerdict["isAanDeBeurt"]
-                speler.is_Gepast = spelerdict["isGepast"]
-                nieuwe_state.stoelen[stoelnummer] = speler
-            async with STATE_LOCK:
-                state = nieuwe_state
+        try:
+            event: dict = json.loads(message)
+            if not isinstance(event, dict):
+                raise ValueError("Received message is not a valid dictionary.")
+
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Failed to decode message: {message}, Error: {str(e)}")
+            continue  # Skip processing for this invalid message
+
+        if not "type" in event:
+            print(f"[ERROR] Received message with no 'type' field: {event}")
+            continue
+
+        if event["type"] == 'register': continue
+
+        # elif event["type"] == 'gamestate':
+        #     print(f"received gamestate update")
+        #     nieuwe_state = GameState()
+        #     # download gamestate
+        #     nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
+        #     nieuwe_state.river = [
+        #         {"kleur": kaart["kleur"], "waarde": kaart["waarde"]} if kaart else None
+        #         for kaart in event["river"]
+        #     ]
+        #     nieuwe_state.spelersdata = event["spelers"]
+        #     nieuwe_state.stoelen = {}
+        #     for stoelnummer, spelerdict in nieuwe_state.spelersdata.items():
+        #         hand = []
+        #         for kaart in spelerdict["hand"]:
+        #             if kaart:
+        #                 hand.append(Kaart(kaart["kleur"], kaart["waarde"]))
+        #             else:
+        #                 hand.append(None)
+        #         speler = Speler(
+        #             naam=spelerdict["naam"],
+        #             coins=spelerdict["coins"],
+        #             hand=hand
+        #         )
+        #         speler.is_AanDeBeurt = spelerdict["isAanDeBeurt"]
+        #         speler.is_Gepast = spelerdict["isGepast"]
+        #         nieuwe_state.stoelen[stoelnummer] = speler
+        #     async with STATE_LOCK:
+        #         state = nieuwe_state
+        elif event["type"] == 'gamestate':
+            print(f"Received gamestate update")
+            try:
+                nieuwe_state = GameState()
+                # download gamestate
+                nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
+                nieuwe_state.river = [
+                    {"kleur": kaart["kleur"], "waarde": kaart["waarde"]} if kaart else None
+                    for kaart in event["river"]
+                ]
+                nieuwe_state.spelersdata = event["spelers"]
+                
+                nieuwe_state.stoelen = {}
+                for stoelnummer, spelerdict in nieuwe_state.spelersdata.items():
+                    stoelnummer = int(stoelnummer)
+                    hand = []
+                    for kaart in spelerdict["hand"]:
+                        if kaart:
+                            hand.append(Kaart(kaart["kleur"], kaart["waarde"]))
+                        else:
+                            hand.append(None)
+                    speler = Speler(
+                        naam=spelerdict["naam"],
+                        coins=spelerdict["coins"],
+                        hand=hand
+                    )
+                    speler.is_AanDeBeurt = spelerdict["isAanDeBeurt"]
+                    speler.is_Gepast = spelerdict["isGepast"]
+                    nieuwe_state.stoelen[stoelnummer] = speler
+                async with STATE_LOCK:
+                    state = nieuwe_state
+            except KeyError as e:
+                print(f"[ERROR] Missing key in gamestate update: {e}")
+            except Exception as e:
+                print(f"[ERROR] Unexpected error while updating gamestate: {e}")
 
         elif event["type"] == 'info':
             print(event['message'])
         elif event['type'] == 'error':
             print(event['message'])
         else:
-            print(f"received event of type {event["type"]} which is not supported")
+            print(f'received event of type {event["type"]} which is not supported')
         pass # handle messages
 
 # Function to handle sending messages from the queue
-async def send_messages(websocket, queue)->None:
+async def send_messages(websocket, queue, my_uuid:str)->None:
+    uuid = {'uuid': my_uuid}
     while True:
+        await asyncio.sleep(0)
+        if shutdown_event.is_set():
+            break  # Stop de lus als het shutdown-event is ingesteld
         try:
-            message = await queue.get()
-            await websocket.send(message)
+            message:dict = await queue.get()
+            message.update(uuid)
+            await websocket.send(json.dumps(message))
             queue.task_done()
         except websockets.ConnectionClosed:
             print("Connection to server lost.")
@@ -260,11 +364,19 @@ async def send_messages(websocket, queue)->None:
             print(f"Error sending message: {e}")
 
     
-async def handle_networking(websocket:websockets.asyncio.connection.Connection,naam:str,queue:asyncio.Queue):
-    client_uuid:str = await startup_handshake(websocket,naam)
+async def handle_networking(websocket: websockets.asyncio.connection.Connection, naam: str, queue: asyncio.Queue):
+    try:
+        client_uuid = await startup_handshake(websocket, naam)
+        read_task = asyncio.create_task(read_messages(websocket, client_uuid))
+        send_task = asyncio.create_task(send_messages(websocket, queue, client_uuid))
+        await asyncio.gather(read_task, send_task)
+    except websockets.exceptions.InvalidURI as e:
+        print(f"[ERROR] Invalid WebSocket URI: {e}")
+    except websockets.exceptions.ConnectionClosedError as e:
+        print(f"[ERROR] WebSocket connection was closed unexpectedly: {e}")
+    except Exception as e:
+        print(f"[ERROR] Unexpected error during networking: {e}")
 
-    read_task = asyncio.create_task(read_messages(websocket))
-    send_task = asyncio.create_task(send_messages(websocket,queue))
 
 
 # async def send_action(websocket, action):
@@ -272,65 +384,84 @@ async def handle_networking(websocket:websockets.asyncio.connection.Connection,n
 #     await websocket.send(message)
 
 
+# Raise Amount Input
+async def get_raise_amount(screen, font):
+    """Prompt user to enter a raise amount."""
+    input_box = pygame.Rect(300, 500, 200, 50)
+    color = (255, 255, 255)
+    text = ''
+    active = False
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                active = input_box.collidepoint(event.pos)
+            elif event.type == pygame.KEYDOWN and active:
+                if event.key == pygame.K_RETURN:
+                    return int(text) if text.isdigit() else None
+                elif event.key == pygame.K_BACKSPACE:
+                    text = text[:-1]
+                else:
+                    text += event.unicode
+
+        screen.fill((0, 0, 0), input_box)
+        pygame.draw.rect(screen, color, input_box)
+        txt_surface = font.render(text, True, (0, 0, 0))
+        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
+        pygame.display.flip()
+        await asyncio.sleep(0)
+
 # Main game loop
 async def game_loop(websocket,queue:asyncio.Queue):
-    pygame.init()
-    screen = pygame.display.set_mode((800, 800))
-    pygame.display.set_caption("Poker Tafel")
-    clock = pygame.time.Clock()
-
-    font = pygame.font.Font(None, 36)
-    BLUE = (0, 0, 255)
-    LIGHTBLUE = (173, 216, 230)
 
     pass_button = Button(50,600,200,150,"Pass",font,BLUE,LIGHTBLUE,BLACK)
     check_button = Button(300,600,200,150,"Check",font,BLUE,LIGHTBLUE,BLACK)
     raise_button = Button(550,600,200,150,"Raise",font,BLUE,LIGHTBLUE,BLACK)
 
+    counter = 0
+    request_gamestate = {"type":'request gamestate'}
+
     running = True
     while running:
+        counter+=1
+        if counter%50 == 0:
+            await queue.put(request_gamestate)
         async with STATE_LOCK:
             game_state = state
+
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
+                shutdown_event.set()
             elif pass_button.is_clicked(event):
-                # add message to the queue
-                # await queue.put(message) 
-                pass
+                await queue.put({"type": "action", "action": "pass"})
             elif check_button.is_clicked(event):
-                # add message to the queue
-                pass
+                await queue.put({"type": "action", "action": "check"})
             elif raise_button.is_clicked(event):
-                # handle raise
-                # add message to the queue
-                pass
-        # Scherm vullen
-        screen.fill(TABLE_GREEN)
+                pass # its fucking broken
+                raise_amount = await get_raise_amount(screen, font)
+                if raise_amount:
+                    await queue.put({"type": "action", "action": "raise", "amount": raise_amount})
 
-        # Tekenen van de spelers en hun kaarten
+        screen.fill((0, 100, 0))
         draw_game_state(screen, game_state)
+        pass_button.draw(screen)
+        check_button.draw(screen)
+        raise_button.draw(screen)
 
-        # Tekenen van de river (gemeenschappelijke kaarten)
-        draw_river(screen, game_state.river)
-
-        draw_buttons(screen,(pass_button,check_button,raise_button))
-        # Update het scherm
         pygame.display.flip()
         await asyncio.sleep(0)
         clock.tick(30)
 
-
-    # add message to the queue, telling the server that I want to disconnect
-    # for now just close the websocket
     await websocket.close()
-
     pygame.quit()
 
 
 async def main():
-    naam:str = input("Wat is jouw naam? Maximaal 10 characters")[:10]
+    naam:str = input("Wat is jouw naam? Maximaal 10 characters ")[:10]
     if any(c in naam for c in ["'", '"', ",", ".", "\\", "/"]):
         print("Ongeldige karakters in naam.")
         exit()

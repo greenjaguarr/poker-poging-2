@@ -26,17 +26,19 @@ class Kaart:
         self.waarde = waarde
 
 class Speler:
-    def __init__(self, naam, coins, kaart1=None, kaart2=None, kaart1_dicht=True, kaart2_dicht=True):
+    def __init__(self, naam: str, coins: int, hand: list[tuple[Kaart, bool]] = None):
+        """
+        Parameters:
+        - naam: Name of the player.
+        - coins: The number of coins the player has.
+        - hand: A list of tuples, each containing a Kaart instance and a boolean for face-down status.
+        """
         self.naam: str = naam
         self.coins: int = coins
-        self.hand: list[tuple[Kaart, bool]] = [
-            (kaart1, kaart1_dicht),
-            (kaart2, kaart2_dicht)
-        ]
+        self.hand: list[tuple[Kaart, bool]] = hand or []
         self.is_AanDeBeurt: bool = False
-        self.is_Gepast: bool = True
-
-        self.stoelnummer:int = None # op welk vakje wordt deze persoon neergezet # TO DO
+        self.is_Gepast: bool = False
+        self.stoelnummer:int
 
 class GameState:
     def __init__(self) -> None:
@@ -44,6 +46,7 @@ class GameState:
         self.spelers:dict = {}  # {client_uuid: speler_object}
         self.AanDeBerut:str = None # uuid of player whos turn it is
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
+        self.is_stoel_bezet = [False,False,False,False,False,False,False,False]
 
     def create_state_message(self, target_uuid) -> str:
         """
@@ -59,7 +62,7 @@ class GameState:
                 "naam": speler.naam,
                 "coins": speler.coins,
                 "hand": [
-                    {"kleur": kaart.kleur, "waarde": kaart.waarde} if uuid == target_uuid or not dicht else None
+                    {"kleur": kaart.kleur, "waarde": kaart.waarde} if (uuid == target_uuid or not dicht) and kaart is not None else None
                     for kaart, dicht in speler.hand
                 ],
                 "isAanDeBeurt": speler.is_AanDeBeurt,
@@ -100,10 +103,17 @@ class GameState:
     def voeg_speler_toe(self, client_uuid, speler):
         if len(self.spelers) >= self.MAXSPELERS:
             raise ValueError("Maximale aantal spelers bereikt.")
+        for i,stoel in enumerate(self.is_stoel_bezet):
+            if stoel==False:
+                speler.stoelnummer = i+1
+                self.is_stoel_bezet[i] = True
+                break
         self.spelers[client_uuid] = speler
 
     def verwijder_speler(self, client_uuid):
         if client_uuid in self.spelers:
+            stoel = self.spelers[client_uuid].stoelnummer
+            self.is_stoel_bezet[stoel-1] = False
             del self.spelers[client_uuid]
         
     def volgende_beurt(self):
@@ -189,7 +199,7 @@ async def handle_message(websocket, client_uuid):
 
             if event['type'] == 'request gamestate':
                 msg = state.create_state_message(client_uuid) # use uuid or websocket to refer to a specific player?
-                await websocket.send(json.dumps(msg))
+                await websocket.send(msg)
 
 
                         # Verwerk een disconnect event
