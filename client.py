@@ -442,6 +442,7 @@ async def game_loop(websocket,queue:asyncio.Queue):
             elif check_button.is_clicked(event):
                 await queue.put({"type": "action", "action": "check"})
             elif raise_button.is_clicked(event):
+                await queue.put({"type": "action", "action": "raise", "amount": 10})
                 pass # its fucking broken
                 raise_amount = await get_raise_amount(screen, font)
                 if raise_amount:
