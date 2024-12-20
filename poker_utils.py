@@ -7,19 +7,20 @@ class Kaart:
         return f"Kaart(kleur='{self.kleur}', waarde='{self.waarde}')"
 
 def heeft_paar(hand):
-    # Maak een dictionary om de frequentie van elke waarde bij te houden
+    # Maak een dictionary om de kaarten te groeperen op hun waarde
     waarde_teller = {}
     
+    # Groepeer de kaarten op waarde
     for kaart in hand:
         if kaart.waarde in waarde_teller:
-            waarde_teller[kaart.waarde] += 1
+            waarde_teller[kaart.waarde].append(kaart)
         else:
-            waarde_teller[kaart.waarde] = 1
+            waarde_teller[kaart.waarde] = [kaart]
     
-    # Zoek naar alle waarden die precies twee keer voorkomen
-    paren = [waarde for waarde, aantal in waarde_teller.items() if aantal == 2]
+    # Zoek naar alle paren (waarden met precies 2 kaarten)
+    paren = [kaarten for kaarten in waarde_teller.values() if len(kaarten) == 2]
     
-    return paren if paren else None  # Retourneer alle paren of None als er geen paren zijn
+    return paren if paren else None  # Retourneer de paren of None als er geen paren zijn
 
 # Voorbeeld van een pokerhand van 7 kaarten
 hand = [
@@ -35,6 +36,6 @@ hand = [
 # Test de functie
 paren = heeft_paar(hand)
 if paren:
-    print(f"Er zitten paren in de hand van {', '.join(paren)}.")
+    print(f"Er zitten de volgende paren in de hand: {paren}")
 else:
     print("Er zitten geen paren in de hand.")
