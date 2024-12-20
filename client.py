@@ -144,9 +144,11 @@ def draw_game_state(screen, game_state):
         screen.blit(coins_text, (x + 10, y + 35))
 
         # Kaarten tekenen (open of dicht)
-        for j, (kaart, dicht) in enumerate(speler.hand):
+        for j, kaart in enumerate(speler.hand):
             kaart_x = x + 160 + j * 70
-            kaart.draw(screen, kaart_x, y, dicht=dicht)
+            if not kaart:
+                continue
+            kaart.draw(screen, kaart_x, y, dicht=False)
 
 def draw_buttons(screen:pygame.Surface,buttons:tuple[Button]):
     for button in buttons:

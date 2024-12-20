@@ -40,7 +40,7 @@ class Speler:
         self.is_AanDeBeurt: bool = False
         self.is_Gepast: bool = False
         self.stoelnummer:int
-        self.current_bet:int
+        self.current_bet:int = 0
         self.mostrecentaction = None
 
     async def wait_for_action(self):
@@ -69,13 +69,21 @@ class GameState:
             if speler.stoelnummer in spelers_data:
                 raise ValueError(f"Duplicate stoelnummer detected: {speler.stoelnummer}")
             
+            if (uuid == target_uuid):
+                hand = speler.hand
+            else:
+                hand = [None, None]
+
             spelers_data[speler.stoelnummer] = {
                 "naam": speler.naam,
                 "coins": speler.coins,
-                "hand": [
-                    {"kleur": kaart.kleur, "waarde": kaart.waarde} if (uuid == target_uuid or not dicht) and kaart is not None else None
-                    for kaart, dicht in speler.hand
-                ],
+                "current_bet": speler.current_bet,
+                "mostrecentaction": speler.mostrecentaction,
+                "hand": hand,
+                # "hand": [
+                #     {"kleur": kaart.kleur, "waarde": kaart.waarde} if (uuid == target_uuid or not dicht) and kaart is not None else None
+                #     for kaart, dicht in speler.hand
+                # ],
                 "isAanDeBeurt": speler.is_AanDeBeurt,
                 "isGepast": speler.is_Gepast,
                 "stoelnummer": speler.stoelnummer
@@ -119,6 +127,7 @@ class GameState:
                 self.is_stoel_bezet[i] = True
                 break
         print("[CONNECTION]",f'Beshcikbare stoelen {["X" if stoel else "O" for stoel in self.is_stoel_bezet]}')
+        speler.action_event = asyncio.Event()
         self.spelers[client_uuid] = speler
 
     def verwijder_speler(self, client_uuid):
@@ -158,6 +167,8 @@ class GameState:
 
 
     def eerste_fase(self,iterator):
+        self.current_bet = 0  # Start met een inzet van 0
+        self.highest_bet = 0  # De hoogste inzet start op 0
         """Handle the initial blinds phase."""
         self.round_state = "eerste_fase"
         next_player = next(iterator)
@@ -168,6 +179,7 @@ class GameState:
     async def bied_fase(self, iterator):
         """Verwerkt de biedronde waar elke speler kan passen, checken of raisen."""
         self.round_state = "biedfase"
+        print("Biedfase begint")
         self.current_bet = 0  # Start met een inzet van 0
         self.highest_bet = 0  # De hoogste inzet start op 0
         actieve_spelers = self.actieve_spelers()  # Alle actieve spelers (niet gepast)
@@ -178,6 +190,8 @@ class GameState:
             speler_uuid = next(iterator)
             speler:Speler = self.spelers[speler_uuid]
             print(speler.naam, ' is aan de beurt' )
+            speler.is_AanDeBeurt = True
+            
 
             if speler.is_Gepast:
                 continue  # Sla spelers over die gepast hebben
@@ -246,6 +260,7 @@ class GameState:
         logging.info(f"Speler {winnaar.naam} wint de pot van {self.pot} coins.")
     
     async def doe_1_ronde(self,deler_uuid):
+        print("Nieuwe ronde begint")
         """Execute one full poker round."""
 
         # SETUP
@@ -266,13 +281,15 @@ class GameState:
         actieve_spelers:list[str] = self.spelers.keys()
         # turn it into an iterator that can loop
         iterator = cycle(actieve_spelers)
+        print("[DEBUG] Making the dealer start.")
         while next(iterator) != deler_uuid:
+            asyncio.sleep(1)
             continue
 
         # BEGIN
 
         self.eerste_fase(iterator)
-        await self.bied_fase()
+        await self.bied_fase(iterator)
         self.river[0] = self.kaarten.pop()
         self.river[1] = self.kaarten.pop()
         self.river[2] = self.kaarten.pop()
@@ -301,29 +318,17 @@ async def game_loop():
     while len(state.spelers) < 2:
         await asyncio.sleep(3)
         print("not enough players")
+    print("Genoeg spelers")
+    await asyncio.sleep(3)
     print("De game begint")
 
 
     while True:
-        def advance_deler(deler):
-            bezette_stoelen = state.bezette_stoelen()
-            deler = deler%8
-            deler+=1
-            while not deler in bezette_stoelen:
-                deler = deler%8
-                deler+=1
-            return deler
-        deler = advance_deler(deler)
-        deler_uuid = None
-        for uuid,speler in state.spelers.items():
-            if speler.stoelnummer == deler:
-                deler_uuid = uuid
-        if deler_uuid == None:
-            exit() # rip
+        # Start een nieuwe ronde
+        deler_uuid = random.choice(list(state.spelers.keys()))
 
         print("[GAME] Game loopt. Bezig met state updates...", "Nieuwe ronde begint")
-        # TODO: Voeg hier logica toe voor het beheren van rondes, inzetten, enz.
-        await state.doe_1_ronde(deler)
+        await state.doe_1_ronde(deler_uuid)
 
 
 
