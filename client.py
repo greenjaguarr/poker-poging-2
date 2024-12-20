@@ -182,6 +182,7 @@ class GameState:
         self.stoelen:dict = {}  # {stoelnummer: speler_object}
         self.AanDeBerut:str = None # uuid of player whos turn it is
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
+        self.pot:int = 0
 
 STATE_LOCK = asyncio.Lock()
 global state
