@@ -180,7 +180,7 @@ class GameState:
     def __init__(self) -> None:
         self.MAXSPELERS = 8
         self.stoelen:dict = {}  # {stoelnummer: speler_object}
-        self.AanDeBerut:str = None # uuid of player whos turn it is
+        # self.AanDeBerut:str = None # uuid of player whos turn it is
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
         self.pot:int = 0
 
@@ -250,7 +250,7 @@ async def read_messages(websocket,client_uuid)->None:
             try:
                 nieuwe_state = GameState()
                 # download gamestate
-                nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
+                # nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
                 nieuwe_state.river = [
                     {"kleur": kaart["kleur"], "waarde": kaart["waarde"]} if kaart else None
                     for kaart in event["river"]
