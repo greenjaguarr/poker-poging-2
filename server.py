@@ -129,6 +129,7 @@ class GameState:
                 speler.stoelnummer = i+1
                 self.is_stoel_bezet[i] = True
                 break
+        speler.is_Gepast = True
         print("[CONNECTION]",f'Beshcikbare stoelen {["X" if stoel else "O" for stoel in self.is_stoel_bezet]}')
         speler.action_event = asyncio.Event()
         self.spelers[client_uuid] = speler
@@ -224,7 +225,7 @@ class GameState:
                     # goto actie == "check"
                     speler.is_AanDeBeurt = False
                     self.check_length+=1
-                    continue # do nothing
+                     # do nothing
                 elif speler.current_bet > self.highest_bet:
                     # speler kan niet passen als de inzet hoger is dan de hoogste inzet
                     # goto actie == "raise"
@@ -278,7 +279,7 @@ class GameState:
             print("[DEBUG] Check length: ",self.check_length)
             print("[DEBUG] Actieve spelers: ",self.actieve_spelers())
             # Controleer of de biedronde klaar is (alle spelers hebben dezelfde inzet of gepast)
-            if all(speler.is_Gepast for speler in self.spelers.values()) or self.check_length == len(self.actieve_spelers()):
+            if all(speler.is_Gepast for speler in self.spelers.values()) or self.check_length >= len(self.actieve_spelers()):
                 print("einde biedronde(1)")
                 break  # Einde biedronde
 
@@ -379,7 +380,7 @@ async def game_loop():
         print("not enough players")
         await asyncio.sleep(3)
     print("Genoeg spelers")
-    await asyncio.sleep(3) # wait for players to vote for start
+    await asyncio.sleep(10) # wait for players to vote for start
     print("De game begint")
 
 

@@ -376,7 +376,7 @@ async def game_loop(websocket,queue:asyncio.Queue):
     running = True
     while running:
         counter+=1
-        if counter%50 == 0:
+        if counter%10 == 0:
             await queue.put(request_gamestate)
         async with STATE_LOCK:
             game_state = state
