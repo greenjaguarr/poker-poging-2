@@ -239,7 +239,7 @@ class GameState:
                 # Als de speler raise, verhogen we de inzet
                 bedrag = speler.mostrecentaction.get("amount", 0)
 
-                target_bet = speler.highest_bet + bedrag
+                target_bet = self.highest_bet + bedrag
 
                 # moet deze check perse hier
                 if target_bet < self.highest_bet:
@@ -254,7 +254,7 @@ class GameState:
                 elif target_bet > self.highest_bet:
                     self.bet(speler_uuid, bedrag)
                     logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
-                    
+
             speler.is_AanDeBeurt = False  # Speler is klaar met handelen
 
 

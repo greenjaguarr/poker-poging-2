@@ -252,7 +252,7 @@ async def read_messages(websocket,client_uuid)->None:
                 # download gamestate
                 # nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
                 nieuwe_state.river = [
-                    {"kleur": kaart["kleur"], "waarde": kaart["waarde"]} if kaart else None
+                    Kaart(kaart["kleur"], kaart["waarde"]) if kaart else None
                     for kaart in event["river"]
                 ]
                 nieuwe_state.spelersdata = event["spelers"]
