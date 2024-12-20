@@ -95,7 +95,8 @@ class GameState:
                 {"kleur": kaart.kleur, "waarde": kaart.waarde} if kaart else None
                 for kaart in self.river
             ],
-            "aanDeBeurt": self.AanDeBerut,
+            # "aanDeBeurt": self.AanDeBerut,
+            "pot": self.pot,
         })
     
 
@@ -229,6 +230,8 @@ class GameState:
                 # logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
                 speler.bet(speler_uuid, bedrag)
 
+            speler.is_AanDeBeurt = False  # Speler is klaar met handelen
+
 
             # Controleer of de biedronde klaar is (alle spelers hebben dezelfde inzet of gepast)
             if all(speler.current_bet == self.highest_bet or speler.is_Gepast for speler in self.spelers.values()):
@@ -295,11 +298,11 @@ class GameState:
         self.river[0] = self.kaarten.pop()
         self.river[1] = self.kaarten.pop()
         self.river[2] = self.kaarten.pop()
-        await self.bied_fase()
+        await self.bied_fase(iterator)
         self.river[3] = self.kaarten.pop()
-        await self.bied_fase()
+        await self.bied_fase(iterator)
         self.river[4] = self.kaarten.pop()
-        await self.bied_fase()
+        await self.bied_fase(iterator)
         self.bepaal_winnaar()
 
     #     # Check for winner
@@ -389,7 +392,7 @@ async def handle_message(websocket, client_uuid):
                 continue
             # Verwerk acties
             elif event["type"] == "action":
-                if not state.spelers[client_uuid].isAanDeBeurt:
+                if not state.spelers[client_uuid].is_AanDeBeurt:
                     continue
                 try:
                     state.handle_client_input(event, client_uuid)

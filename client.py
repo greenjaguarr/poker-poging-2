@@ -118,6 +118,9 @@ def draw_game_state(screen, game_state):
 
     font = pygame.font.SysFont("arial", 28)
 
+    # draw pot
+    screen.blit(font.render(f"Pot: {game_state.pot}", True, FONT_COLOR), (screen_width - 150, 10))
+    
     for stoelnummer, speler in game_state.stoelen.items():
         row = (stoelnummer-1) % 4
         col = (stoelnummer-1) // 4
@@ -143,12 +146,16 @@ def draw_game_state(screen, game_state):
         coins_text = font.render(f"Coins: {speler.coins}", True, FONT_COLOR)
         screen.blit(coins_text, (x + 10, y + 35))
 
+        current_bet_text = font.render(f"Current bet: {speler.current_bet}", True, FONT_COLOR)
+        screen.blit(current_bet_text, (x + 10, y + 60))
+
         # Kaarten tekenen (open of dicht)
         for j, kaart in enumerate(speler.hand):
             kaart_x = x + 160 + j * 70
             if not kaart:
                 continue
             kaart.draw(screen, kaart_x, y, dicht=False)
+
 
 def draw_buttons(screen:pygame.Surface,buttons:tuple[Button]):
     for button in buttons:
@@ -167,24 +174,7 @@ class Speler:
         self.hand: list[tuple[Kaart, bool]] = hand or []
         self.is_AanDeBeurt: bool = False
         self.is_Gepast: bool = False
-
-# class GameState:
-#     def __init__(self):
-#         self.players = [
-#             Speler("Speler1", 500, Kaart("harten", "A"), Kaart("schoppen", "K"), kaart1_dicht=False, kaart2_dicht=True),
-#             Speler("Speler2", 400, Kaart("ruiten", "5"), Kaart("klaveren", "7"), kaart1_dicht=True, kaart2_dicht=True),
-#             Speler("Speler3", 300, Kaart("harten", "3"), Kaart("klaveren", "4"), kaart1_dicht=False, kaart2_dicht=False),
-#             Speler("Speler4", 450, Kaart("schoppen", "9"), Kaart("harten", "2"), kaart1_dicht=True, kaart2_dicht=True),
-#             Speler("Speler5", 350, Kaart("ruiten", "K"), Kaart("klaveren", "5"), kaart1_dicht=False, kaart2_dicht=False),
-#             Speler("Speler6", 600, Kaart("klaveren", "J"), Kaart("harten", "7"), kaart1_dicht=True, kaart2_dicht=False),
-#         ]
-#         self.river = [
-#             Kaart("harten", "A"),
-#             Kaart("schoppen", "10"),
-#             Kaart("klaveren", "2"),
-#             Kaart("ruiten", "V"),
-#             None  # Lege plek voor een mogelijke kaart
-#         ]
+        self.current_bet: int = 0
 
 class GameState:
     def __init__(self) -> None:
@@ -198,28 +188,6 @@ global state
 state = GameState()
 
 shutdown_event = asyncio.Event()
-
-# Networking
-# async def startup_handshake(websocket:websockets.asyncio.connection.Connection,naam:str)->str:
-#     print('[DEBUG] startup handshake client side started')
-#     await websocket.send(json.dumps({"type": "connect", "name":naam}))
-#     await asyncio.sleep(1)
-#     msg = await websocket.recv()
-#     event:dict = json.loads(msg)
-#     if not "type" in event:
-#         raise RuntimeError
-#     if event["type"] == 'error':
-#         errormessage = event['message']
-#         print(errormessage)
-#         exit() # boeie
-
-#     elif event["type"] == 'register':
-#         my_uuid:str = event['uuid']
-#     else:
-#         print("huh")
-#         exit()
-#     print('[DEBUG] startup handshake client side finished')
-#     return my_uuid
 
 async def startup_handshake(websocket: websockets.asyncio.connection.Connection, naam: str) -> str:
     print('[DEBUG] startup handshake client side started')
@@ -304,7 +272,9 @@ async def read_messages(websocket,client_uuid)->None:
                     )
                     speler.is_AanDeBeurt = spelerdict["isAanDeBeurt"]
                     speler.is_Gepast = spelerdict["isGepast"]
+                    speler.current_bet = spelerdict["current_bet"]
                     nieuwe_state.stoelen[stoelnummer] = speler
+                    nieuwe_state.pot = event["pot"]
                 async with STATE_LOCK:
                     state = nieuwe_state
             except KeyError as e:
