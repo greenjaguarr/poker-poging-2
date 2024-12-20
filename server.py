@@ -207,29 +207,54 @@ class GameState:
 
             actie = speler.mostrecentaction["action"]
             if actie == "pass":
-                speler.is_Gepast = True  # Markeer de speler als gepast
-                logging.info(f"Speler {speler.naam} heeft gepast.")
+                if speler.current_bet < self.highest_bet:                    
+                    speler.is_Gepast = True  # Markeer de speler als gepast
+                    logging.info(f"Speler {speler.naam} heeft gepast.")
+                elif speler.current_bet == self.highest_bet:
+                    # speler kan niet passen als de inzet gelijk is aan de hoogste inzet
+                    # goto actie == "check"
+                    continue # do nothing
+                elif speler.current_bet > self.highest_bet:
+                    # speler kan niet passen als de inzet hoger is dan de hoogste inzet
+                    # goto actie == "raise"
+                    raise ValueError("Speler kan niet passen als zijn inzet hoger is dan de hoogste inzet")
+                    exit() # crash because idk how this happened
             elif actie == "check":
                 # Check of de speler de huidige inzet gelijk houdt
                 if speler.current_bet < self.highest_bet:
                     # Als de inzet niet gelijk is, moet de speler de juiste hoeveelheid betalen
                     ontbrekend_bedrag = self.highest_bet - speler.current_bet
                     self.bet(speler_uuid, ontbrekend_bedrag)
-                logging.info(f"Speler {speler.naam} heeft gecheckt.")
+                    logging.info(f"Speler {speler.naam} heeft gecheckt.")
+                elif speler.current_bet == self.highest_bet:
+                    logging.info(f"Speler {speler.naam} heeft gecheckt.")
+                    continue
+                elif speler.current_bet > self.highest_bet:
+                    # speler kan niet checken als de inzet hoger is dan de hoogste inzet
+                    # goto actie == "raise"
+                    raise ValueError("Speler kan niet checken als zijn inzet hoger is dan de hoogste inzet")
+                    exit()
+
             elif actie == "raise":
                 # Als de speler raise, verhogen we de inzet
                 bedrag = speler.mostrecentaction.get("amount", 0)
 
-                # moet deze check perse hier
-                if bedrag <= self.highest_bet:
-                    logging.warning(f"Speler {speler.naam} probeert te raisen met een bedrag dat lager is dan de hoogste inzet.")
-                    continue  # We negeren dit, omdat het minder is dan de hoogste bet
+                target_bet = speler.highest_bet + bedrag
 
-                # self.highest_bet = bedrag  # Update de hoogste inzet
-                # self.bet(speler_uuid, bedrag - speler.current_bet)  # Betale het verschil
-                # logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
-                self.bet(speler_uuid, bedrag)
-                logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
+                # moet deze check perse hier
+                if target_bet < self.highest_bet:
+                    logging.warning(f"Speler {speler.naam} probeert te raisen met een bedrag dat lager is dan de hoogste inzet.")
+                    # this action is invalid
+                    # simply act as if the player has passed
+                    speler.is_Gepast = True  # Markeer de speler als gepast
+
+                elif target_bet == self.highest_bet:
+                    self.bet(speler_uuid, bedrag)
+
+                elif target_bet > self.highest_bet:
+                    self.bet(speler_uuid, bedrag)
+                    logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
+                    
             speler.is_AanDeBeurt = False  # Speler is klaar met handelen
 
 
