@@ -174,8 +174,9 @@ class GameState:
 
         # Alle actieve spelers krijgen om beurten de kans om te handelen.
         while True:
+            # 1 loop van deze loop is 1 beurt van 1 speler
             speler_uuid = next(iterator)
-            speler = self.spelers[speler_uuid]
+            speler:Speler = self.spelers[speler_uuid]
             print(speler.naam, ' is aan de beurt' )
 
             if speler.is_Gepast:
@@ -201,13 +202,17 @@ class GameState:
             elif actie == "raise":
                 # Als de speler raise, verhogen we de inzet
                 bedrag = speler.mostrecentaction.get("amount", 0)
+
+                # moet deze check perse hier
                 if bedrag <= self.highest_bet:
                     logging.warning(f"Speler {speler.naam} probeert te raisen met een bedrag dat lager is dan de hoogste inzet.")
                     continue  # We negeren dit, omdat het minder is dan de hoogste bet
 
-                self.highest_bet = bedrag  # Update de hoogste inzet
-                self.bet(speler_uuid, bedrag - speler.current_bet)  # Betale het verschil
-                logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
+                # self.highest_bet = bedrag  # Update de hoogste inzet
+                # self.bet(speler_uuid, bedrag - speler.current_bet)  # Betale het verschil
+                # logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
+                speler.bet(speler_uuid, bedrag)
+
 
             # Controleer of de biedronde klaar is (alle spelers hebben dezelfde inzet of gepast)
             if all(speler.current_bet == self.highest_bet or speler.is_Gepast for speler in self.spelers.values()):
@@ -216,7 +221,29 @@ class GameState:
         self.round_state = "fase_einde"
         logging.info("Biedronde is geëindigd.")
 
-            
+    def compare(self):
+        # compare hands
+        # get the best hand
+        # give the pot to the player with the best hand
+        # if there is a draw, split the pot
+        # Not implemented yet, for now just give the pot to the first player
+        return "1"
+    
+
+    def bepaal_winnaar(self):
+        """Bepaal de winnaar van de ronde en deel de pot uit."""
+        actieve_spelers = self.actieve_spelers()
+        if len(actieve_spelers) == 1:
+            winnaar_uuid = actieve_spelers[0]
+        else:
+            # for speler_uuid in actieve_spelers:
+            #     for 
+            #     self.compare()
+            # not implemented yet, just give the pot to the first player
+            winnaar_uuid = actieve_spelers[0]
+        winnaar = self.spelers[winnaar_uuid]
+        winnaar.coins += self.pot
+        logging.info(f"Speler {winnaar.naam} wint de pot van {self.pot} coins.")
     
     async def doe_1_ronde(self,deler_uuid):
         """Execute one full poker round."""
