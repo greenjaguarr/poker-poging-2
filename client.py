@@ -119,8 +119,8 @@ def draw_game_state(screen, game_state):
     font = pygame.font.SysFont("arial", 24)
 
     # draw pot
-    screen.blit(font.render(f"Pot: {game_state.pot}", True, FONT_COLOR), (screen_width - 150, 10))
-    screen.blit(font.render(f"Highest bid: {game_state.highest_bet}", True, FONT_COLOR), (screen_width - 150, 20))
+    screen.blit(font.render(f"Pot: {game_state.pot}", True, FONT_COLOR), (screen_width - 250, 10))
+    screen.blit(font.render(f"Highest bid: {game_state.highest_bet}", True, FONT_COLOR), (screen_width - 250, 25))
     
     for stoelnummer, speler in game_state.stoelen.items():
         row = (stoelnummer-1) % 4

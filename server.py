@@ -58,6 +58,7 @@ class GameState:
         self.pot = 0       # Total coins in the pot
         self.current_bet = 0  # Current highest bet
         self.round_state = ""  # Describes the current phase of the game
+        self.highest_bet = 0  # The highest bet in the current round
 
     def create_state_message(self, target_uuid) -> str:
         """
@@ -267,11 +268,12 @@ class GameState:
 
             # Controleer of de biedronde klaar is (alle spelers hebben dezelfde inzet of gepast)
             if all(speler.current_bet == self.highest_bet or speler.is_Gepast for speler in self.spelers.values()):
-                print("Eidne biedronde")
+                print("einde biedronde(1)")
                 break  # Einde biedronde
 
         self.round_state = "fase_einde"
         logging.info("Biedronde is geëindigd.")
+        print("einde biedronde(2).")
 
     def compare(self):
         # compare hands
@@ -332,15 +334,20 @@ class GameState:
         # BEGIN
 
         self.eerste_fase(iterator)
+        print("[DEBUG] 0 kaarten in river")
         await self.bied_fase(iterator)
         self.river[0] = self.kaarten.pop()
         self.river[1] = self.kaarten.pop()
         self.river[2] = self.kaarten.pop()
+        print("[DEBUG] 3 kaarten in river")
         await self.bied_fase(iterator)
         self.river[3] = self.kaarten.pop()
+        print("[DEBUG] 4 kaarten in river")
         await self.bied_fase(iterator)
         self.river[4] = self.kaarten.pop()
+        print("[DEBUG] 5 kaarten in river")
         await self.bied_fase(iterator)
+        print("[DEBUG] bepaal winnaar")
         self.bepaal_winnaar()
 
     #     # Check for winner
