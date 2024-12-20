@@ -190,6 +190,8 @@ class GameState:
         # self.highest_bet = 0  # De hoogste inzet start op 0
         actieve_spelers = self.actieve_spelers()  # Alle actieve spelers (niet gepast)
 
+        self.check_length:int = 0
+
         # Alle actieve spelers krijgen om beurten de kans om te handelen.
         while True:
             # 1 loop van deze loop is 1 beurt van 1 speler
@@ -215,10 +217,13 @@ class GameState:
                 if speler.current_bet < self.highest_bet:                    
                     speler.is_Gepast = True  # Markeer de speler als gepast
                     logging.info(f"Speler {speler.naam} heeft gepast.")
+                    self.check_length:int = 0
+
                 elif speler.current_bet == self.highest_bet:
                     # speler kan niet passen als de inzet gelijk is aan de hoogste inzet
                     # goto actie == "check"
                     speler.is_AanDeBeurt = False
+                    self.check_length+=1
                     continue # do nothing
                 elif speler.current_bet > self.highest_bet:
                     # speler kan niet passen als de inzet hoger is dan de hoogste inzet
@@ -231,11 +236,13 @@ class GameState:
                     # Als de inzet niet gelijk is, moet de speler de juiste hoeveelheid betalen
                     ontbrekend_bedrag = self.highest_bet - speler.current_bet
                     self.bet(speler_uuid, ontbrekend_bedrag)
+                    self.check_length+=1
                     logging.info(f"Speler {speler.naam} heeft gecheckt.")
                 elif speler.current_bet == self.highest_bet:
                     logging.info(f"Speler {speler.naam} heeft gecheckt.")
                     speler.is_AanDeBeurt = False
-                    continue
+                    self.check_length+=1
+                    # continue
                 elif speler.current_bet > self.highest_bet:
                     # speler kan niet checken als de inzet hoger is dan de hoogste inzet
                     # goto actie == "raise"
@@ -255,19 +262,23 @@ class GameState:
                     # this action is invalid
                     # simply act as if the player has passed
                     speler.is_Gepast = True  # Markeer de speler als gepast
+                    self.check_length:int = 0
 
                 elif target_bet == self.highest_bet:
                     self.bet(speler_uuid, bedrag)
+                    self.check_length+=1
 
                 elif target_bet > self.highest_bet:
                     self.bet(speler_uuid, bedrag)
                     logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
+                    self.check_length:int = 1
 
             speler.is_AanDeBeurt = False  # Speler is klaar met handelen
 
-
+            print("[DEBUG] Check length: ",self.check_length)
+            print("[DEBUG] Actieve spelers: ",self.actieve_spelers())
             # Controleer of de biedronde klaar is (alle spelers hebben dezelfde inzet of gepast)
-            if all(speler.current_bet == self.highest_bet or speler.is_Gepast for speler in self.spelers.values()):
+            if all(speler.is_Gepast for speler in self.spelers.values()) or self.check_length == len(self.actieve_spelers()):
                 print("einde biedronde(1)")
                 break  # Einde biedronde
 
@@ -362,14 +373,13 @@ async def game_loop():
     """
     Periodieke taken voor de game, zoals het bijwerken van de staat.
     """
-    await asyncio.sleep(3)
-    deler = 7
+    # await asyncio.sleep(3)
 
     while len(state.spelers) < 2:
-        await asyncio.sleep(3)
         print("not enough players")
+        await asyncio.sleep(3)
     print("Genoeg spelers")
-    await asyncio.sleep(3)
+    await asyncio.sleep(3) # wait for players to vote for start
     print("De game begint")
 
 

@@ -16,7 +16,7 @@ BLACK = (0, 0, 0)
 CARD_COLOR = (240, 240, 240)  # Kleur van kaarten
 FONT_COLOR = (0, 0, 0)
 TABLE_GREEN = (0, 100, 0)
-font = pygame.font.Font(None, 36)
+font = pygame.font.Font(None, 22)
 BLUE = (0, 0, 255)
 LIGHTBLUE = (173, 216, 230)
 GREY = (150,150,150)
@@ -24,6 +24,7 @@ GREY = (150,150,150)
 # Kaart Class
 class Kaart:
     SUIT_SYMBOLS = {"harten": "♥", "ruiten": "♦", "klaveren": "♣", "schoppen": "♠"}
+    SUIT_SYMBOLS = {"harten": " H ", "ruiten": " R ", "klaveren": " K ", "schoppen": " S "}
 
     def __init__(self, kleur, waarde):
         """
@@ -53,7 +54,7 @@ class Kaart:
 
         if not dicht:
             # Tekst op de kaart (waarde + symbool)
-            font = pygame.font.SysFont("arial", 28)
+            font = pygame.font.SysFont("arial", 22)
             suit_symbol = self.SUIT_SYMBOLS.get(self.kleur, "?")
             text = font.render(f"{self.waarde} {suit_symbol}", True, FONT_COLOR)
             screen.blit(text, (x + 5, y + 5))

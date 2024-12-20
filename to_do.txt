@@ -1,13 +1,15 @@
 game logic:
-make the game show cards after a round
-implement a round
-implement user input
-implement raising
-implement passing
-implement checking
-implement game.pot
-implement speler.ingezette_hoeveelheid
+#make the game show cards after a round
+#implement a round
+#implement user input
+#implement raising
+#implement passing
+#mplement checking
+#implement game.pot
+#implement speler.ingezette_hoeveelheid
 
-game.AanDeBerut # stoelnummer
-speler.is_AanDeBeurt # bool
-speler.is_Gepast # bool
+#game.AanDeBerut # stoelnummer
+#speler.is_AanDeBeurt # bool
+#speler.is_Gepast # bool
+
+maak comparison for hands
