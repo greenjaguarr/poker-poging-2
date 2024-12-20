@@ -228,8 +228,8 @@ class GameState:
                 # self.highest_bet = bedrag  # Update de hoogste inzet
                 # self.bet(speler_uuid, bedrag - speler.current_bet)  # Betale het verschil
                 # logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
-                speler.bet(speler_uuid, bedrag)
-
+                self.bet(speler_uuid, bedrag)
+                logging.info(f"Speler {speler.naam} heeft verhoogd naar {bedrag}.")
             speler.is_AanDeBeurt = False  # Speler is klaar met handelen
 
 
