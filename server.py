@@ -70,7 +70,7 @@ class GameState:
                 raise ValueError(f"Duplicate stoelnummer detected: {speler.stoelnummer}")
             
             if (uuid == target_uuid):
-                hand = speler.hand
+                hand = [{'kleur':kaart.kleur, "waarde": kaart.waarde}for kaart in speler.hand]
             else:
                 hand = [None, None]
 
@@ -196,7 +196,9 @@ class GameState:
             if speler.is_Gepast:
                 continue  # Sla spelers over die gepast hebben
 
+            print(f"awaiting action from player {speler.naam}")
             await speler.wait_for_action()
+            print(f"reveived action from player {speler.naam}")
 
             # # Wacht op de actie van de speler
             # if speler.mostrecentaction is None:  # Als de speler nog niets heeft gedaan
@@ -283,7 +285,7 @@ class GameState:
         iterator = cycle(actieve_spelers)
         print("[DEBUG] Making the dealer start.")
         while next(iterator) != deler_uuid:
-            asyncio.sleep(1)
+            await asyncio.sleep(1)
             continue
 
         # BEGIN

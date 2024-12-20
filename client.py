@@ -275,34 +275,7 @@ async def read_messages(websocket,client_uuid)->None:
 
         if event["type"] == 'register': continue
 
-        # elif event["type"] == 'gamestate':
-        #     print(f"received gamestate update")
-        #     nieuwe_state = GameState()
-        #     # download gamestate
-        #     nieuwe_state.AanDeBeurt = event["aanDeBeurt"]
-        #     nieuwe_state.river = [
-        #         {"kleur": kaart["kleur"], "waarde": kaart["waarde"]} if kaart else None
-        #         for kaart in event["river"]
-        #     ]
-        #     nieuwe_state.spelersdata = event["spelers"]
-        #     nieuwe_state.stoelen = {}
-        #     for stoelnummer, spelerdict in nieuwe_state.spelersdata.items():
-        #         hand = []
-        #         for kaart in spelerdict["hand"]:
-        #             if kaart:
-        #                 hand.append(Kaart(kaart["kleur"], kaart["waarde"]))
-        #             else:
-        #                 hand.append(None)
-        #         speler = Speler(
-        #             naam=spelerdict["naam"],
-        #             coins=spelerdict["coins"],
-        #             hand=hand
-        #         )
-        #         speler.is_AanDeBeurt = spelerdict["isAanDeBeurt"]
-        #         speler.is_Gepast = spelerdict["isGepast"]
-        #         nieuwe_state.stoelen[stoelnummer] = speler
-        #     async with STATE_LOCK:
-        #         state = nieuwe_state
+
         elif event["type"] == 'gamestate':
             print(f"Received gamestate update")
             try:
