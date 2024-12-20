@@ -116,10 +116,11 @@ def draw_game_state(screen, game_state):
     start_x = 20
     start_y = 50
 
-    font = pygame.font.SysFont("arial", 28)
+    font = pygame.font.SysFont("arial", 24)
 
     # draw pot
     screen.blit(font.render(f"Pot: {game_state.pot}", True, FONT_COLOR), (screen_width - 150, 10))
+    screen.blit(font.render(f"Highest bid: {game_state.highest_bet}", True, FONT_COLOR), (screen_width - 150, 20))
     
     for stoelnummer, speler in game_state.stoelen.items():
         row = (stoelnummer-1) % 4
@@ -183,6 +184,7 @@ class GameState:
         # self.AanDeBerut:str = None # uuid of player whos turn it is
         self.river = [None, None, None, None, None] # List of cards in river. None represents no card
         self.pot:int = 0
+        self.highest_bet:int = 0
 
 STATE_LOCK = asyncio.Lock()
 global state
@@ -276,6 +278,7 @@ async def read_messages(websocket,client_uuid)->None:
                     speler.current_bet = spelerdict["current_bet"]
                     nieuwe_state.stoelen[stoelnummer] = speler
                     nieuwe_state.pot = event["pot"]
+                    nieuwe_state.highest_bet = event["highest bid"]
                 async with STATE_LOCK:
                     state = nieuwe_state
             except KeyError as e:

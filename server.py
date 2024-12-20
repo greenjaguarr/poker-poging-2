@@ -97,6 +97,7 @@ class GameState:
             ],
             # "aanDeBeurt": self.AanDeBerut,
             "pot": self.pot,
+            "highest bid": self.highest_bet,
         })
     
 
@@ -181,8 +182,11 @@ class GameState:
         """Verwerkt de biedronde waar elke speler kan passen, checken of raisen."""
         self.round_state = "biedfase"
         print("Biedfase begint")
+        if len(self.actieve_spelers()) == 1:
+            print("biedfase skipped because of only 1 active player")
+            return
         self.current_bet = 0  # Start met een inzet van 0
-        self.highest_bet = 0  # De hoogste inzet start op 0
+        # self.highest_bet = 0  # De hoogste inzet start op 0
         actieve_spelers = self.actieve_spelers()  # Alle actieve spelers (niet gepast)
 
         # Alle actieve spelers krijgen om beurten de kans om te handelen.
@@ -213,6 +217,7 @@ class GameState:
                 elif speler.current_bet == self.highest_bet:
                     # speler kan niet passen als de inzet gelijk is aan de hoogste inzet
                     # goto actie == "check"
+                    speler.is_AanDeBeurt = False
                     continue # do nothing
                 elif speler.current_bet > self.highest_bet:
                     # speler kan niet passen als de inzet hoger is dan de hoogste inzet
@@ -228,10 +233,12 @@ class GameState:
                     logging.info(f"Speler {speler.naam} heeft gecheckt.")
                 elif speler.current_bet == self.highest_bet:
                     logging.info(f"Speler {speler.naam} heeft gecheckt.")
+                    speler.is_AanDeBeurt = False
                     continue
                 elif speler.current_bet > self.highest_bet:
                     # speler kan niet checken als de inzet hoger is dan de hoogste inzet
                     # goto actie == "raise"
+                    print(f"speler.current_bet: {speler.current_bet}, self.highest_bet: {self.highest_bet}")
                     raise ValueError("Speler kan niet checken als zijn inzet hoger is dan de hoogste inzet")
                     exit()
 
@@ -260,6 +267,7 @@ class GameState:
 
             # Controleer of de biedronde klaar is (alle spelers hebben dezelfde inzet of gepast)
             if all(speler.current_bet == self.highest_bet or speler.is_Gepast for speler in self.spelers.values()):
+                print("Eidne biedronde")
                 break  # Einde biedronde
 
         self.round_state = "fase_einde"
@@ -276,6 +284,7 @@ class GameState:
 
     def bepaal_winnaar(self):
         """Bepaal de winnaar van de ronde en deel de pot uit."""
+        print("De game is klaar")
         actieve_spelers = self.actieve_spelers()
         if len(actieve_spelers) == 1:
             winnaar_uuid = actieve_spelers[0]
@@ -298,13 +307,17 @@ class GameState:
         self.pot = 0
         for _,speler in self.spelers.items():
             speler.current_bet = 0
+
+        self.highest_bet = 0
     
         # reset kaarten
         self.river = [None,None,None,None,None] # None represents the lack of a card.
         for uuid, speler in self.spelers.items():
             speler.hand = [None,None]
+            speler.is_Gepast = False
+            speler.current_inzet = 0
         # schud kaarten
-        self.kaarten = [Kaart(kleur, waarde) for kleur in self.SUIT_SYMBOLS.keys() for waarde in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "B", "V" "K"]]
+        self.kaarten = [Kaart(kleur, waarde) for kleur in self.SUIT_SYMBOLS.keys() for waarde in ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "B", "V", "K"]]
         random.shuffle(self.kaarten)
         self.deel_kaarten()
 
