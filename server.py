@@ -21,7 +21,7 @@ class Kaart:
     def __init__(self, kleur, waarde):
         """
         kleur: str, bijv. "harten", "klaveren"
-        waarde: str, bijv. "A", "K", "10"
+        waarde: str, bijv. "A", "K", "T"
         """
         self.kleur = kleur
         self.waarde = waarde
