@@ -6,6 +6,10 @@ class Kaart:
     def __repr__(self):
         return f"Kaart(kleur='{self.kleur}', waarde='{self.waarde}')"
 
+def waarde_naar_getal(waarde):
+    waardes = {"2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "T": 10, "B": 11, "V": 12, "K": 13, "A": 14}
+    return waardes[waarde]
+
 def contains_straight(cards):
     """
     Determine if the given 7-card hand contains one or more straights.
@@ -19,7 +23,7 @@ def contains_straight(cards):
     # Map ranks to numerical values
     rank_map = {
         '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-        '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
+        'T': 10, 'B': 11, 'V': 12, 'K': 13, 'A': 14
     }
 
     # Reverse map to get ranks back from values
@@ -67,6 +71,31 @@ def contains_straight(cards):
 
     return [len(formatted_straights) > 0, formatted_straights if formatted_straights else None]
 
+def bevat_flush(cards):
+    
+    def waarde_naar_getal(waarde):
+        waardes = {"2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "T": 10, "B": 11, "V": 12, "K": 13, "A": 14}
+        return waardes[waarde]
+
+    kaarten_gesorteerd = sorted(hand, key=lambda kaart: waarde_naar_getal(kaart.waarde), reverse=True)
+
+    kleur_telling = {}
+    for kaart in hand:
+        if kaart.kleur in kleur_telling:
+            kleur_telling[kaart.kleur] += 1
+        else:
+            kleur_telling[kaart.kleur] = 1
+       
+    high_cards = []
+    for i in range(7):
+        if kleur_telling[kaarten_gesorteerd[i].kleur] >= 5:
+            high_cards.append(kaarten_gesorteerd[i].waarde)
+    
+    if len(high_cards) >= 5:
+        return True, high_cards[:5]
+    else:
+        return False, []
+
 def all_same_color(cards):
     """
     Check if all cards in the given list have the same color.
@@ -84,17 +113,17 @@ def all_same_color(cards):
 
 def kind_of_straight():
     all_straights = contains_straight(hand)[1]
-    print(len(all_straights))
+
     for i in range(len(all_straights)):
         if all_same_color(all_straights[i]):
             
             if all_straights[i][4].waarde == 'A':            
-                return {10: "A"}
+                return 10, "A"
             else:
-                return {9: all_straights[i][4].waarde}
+                return 9, [all_straights[i][4].waarde]
 
         else:
-            return {5, all_straights[-1][4].waarde}
+            return 5, [all_straights[-1][4].waarde]
 
 def bevat_four_of_a_kind(cards):
     """
@@ -117,7 +146,7 @@ def bevat_four_of_a_kind(cards):
     # Controleer of een waarde precies 4 keer voorkomt
     for waarde, aantal in waarde_telling.items():
         if aantal == 4:
-            return [True, waarde]
+            return True, waarde
 
     return [False]
 
@@ -142,31 +171,52 @@ def bevat_three_of_a_kind(hand):
     # Verzamel alle waarden die precies 3 keer voorkomen
     drie_of_a_kind_waarden = [waarde for waarde, aantal in waarde_telling.items() if aantal == 3]
 
-    # Retourneer True en de lijst van waarden als er Three of a Kind is, anders False en een lege lijst
-    if drie_of_a_kind_waarden:
-        return [True, drie_of_a_kind_waarden]
-    else:
-        return [False]
+    # Sorteer de lijst van 'Three of a Kind'-waarden op sterkte (numerieke waarde)
+    drie_of_a_kind_waarden.sort(key=lambda waarde: waarde_naar_getal(waarde), reverse=True)
+
+    return (len(drie_of_a_kind_waarden) > 0, drie_of_a_kind_waarden)
 
 def bevat_paar(hand):
+    """
+    Controleert of de hand een of meer paren bevat.
+
+    Args:
+        hand (list): Een lijst van 7 Kaart-objecten.
+
+    Returns:
+        tuple: Een tuple met een boolean en een lijst van de waarden waarvan er paren zijn (of een lege lijst als er geen paren zijn).
+    """
     # Maak een dictionary om de kaarten te groeperen op hun waarde
     waarde_teller = {}
-    
+
     # Groepeer de kaarten op waarde
     for kaart in hand:
         if kaart.waarde in waarde_teller:
             waarde_teller[kaart.waarde] += 1
         else:
             waarde_teller[kaart.waarde] = 1
-    
+
     # Zoek naar alle paren (waarden met precies 2 kaarten)
     pair_waarden = [waarde for waarde, aantal in waarde_teller.items() if aantal == 2]
 
-    # Retourneer True en de lijst van waarden als er een paar is, anders False en een lege lijst
-    if pair_waarden:
-        return [True, pair_waarden]
-    else:
-        return [False, []]
+    # Sorteer de lijst van paren op sterkte (numerieke waarde)
+    pair_waarden.sort(key=lambda waarde: waarde_naar_getal(waarde), reverse=True)
+
+    return (len(pair_waarden) > 0, pair_waarden)
+
+def high_card_ranker(hand):
+# Functie om waarde als string om te zetten naar numerieke waarde
+    def waarde_naar_getal(waarde):
+        waardes = {"2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "T": 10, "B": 11, "V": 12, "K": 13, "A": 14}
+        return waardes[waarde]
+
+    kaarten_gesorteerd = sorted(hand, key=lambda kaart: waarde_naar_getal(kaart.waarde), reverse=True)
+    
+    high_card_waardes = []
+    for i in range(7):
+        high_card_waardes.append(kaarten_gesorteerd[i].waarde)
+
+    return high_card_waardes    
 
 def bevat_full_house(quads, trips, paar):
     waardes_voor_trips = []
@@ -213,11 +263,11 @@ def bevat_full_house(quads, trips, paar):
 def beste_full_house():
     rank_map = {
         '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-        '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
+        'T': 10, 'B': 11, 'V': 12, 'K': 13, 'A': 14
     }
     reverse_rank_map = {
         2: '2', 3: '3', 4: '4', 5 : '5', 6: '6', 7: '7', 8: '8', 9: '9',
-        10 :'10', 11: "J", 12: 'Q', 13: 'K', 14: 'A'
+        10 :'T', 11: 'B', 12: 'V', 13: 'K', 14: 'A'
     }
     mogelijkheden_full_house = bevat_full_house(bevat_four_of_a_kind(hand), bevat_three_of_a_kind(hand), bevat_paar(hand))
     
@@ -242,47 +292,84 @@ def beste_full_house():
         beste_paar.append(reverse_rank_map[paar_list[i]])
     
     if beste_paar[0] == beste_trips[0]:
-        beste_FH = [beste_paar[1], beste_trips[0]]
+        beste_FH = [beste_trips[0], beste_paar[1]]
     else:
-        beste_FH = [beste_paar[0], beste_trips[0]]
+        beste_FH = [beste_trips[0], beste_paar[0]]
 
-    return {7: str(beste_FH)}
+    return 7, beste_FH
 
 def score_of_hand(hand):
-    score = {}
-
-    if contains_straight(hand)[0]:
-        print("IT WORKED")
-        score.update(kind_of_straight())
+    ''' 
+    Parameters:
+        hand (list of Kaart): A list of 7 Kaart objects.
     
-    elif bevat_four_of_a_kind(hand)[0]:
-        score.update({8: bevat_four_of_a_kind(hand)[1]})
-
-    # elif bevat_full_house(bevat_four_of_a_kind(hand), bevat_three_of_a_kind(hand), bevat_paar(hand))[0]:
-        
-        score.update(beste_full_house())
-    
-
-
-
-
+    Returns:
+        twee waardes
+        - score van de hand: 10 is het hoogste(royal flush), 1 het laagste(high card)
+        - een lijst met eventuele tiebreakers
+    '''
+    high_cards = high_card_ranker(hand)
     quads = bevat_four_of_a_kind(hand)
-    trips = bevat_three_of_a_kind(hand)
-    paar = bevat_paar(hand)
-    bevat_full_house(quads, trips, paar)
+    trips =  bevat_three_of_a_kind(hand)
+    pairs = bevat_paar(hand)
+    
+    if contains_straight(hand)[0]: # als een straight, straigth flush of straigth het hoogste is
+        return kind_of_straight()
+    
+    elif quads[0]: # als quads het hoogste is
+        if high_cards[0] != quads[1]:
+            return 8, [quads[1], high_cards[0]]
+        else:
+            return 8, [quads(hand)[1], high_cards[4]]
 
-    return score
+    elif bevat_full_house(bevat_four_of_a_kind(hand), bevat_three_of_a_kind(hand), bevat_paar(hand))[0]: # als full house het hoogste is
+        return beste_full_house()
+    
+    elif bevat_flush(hand)[0]:
+        return 6, bevat_flush(hand)[1]
+
+    elif trips[0]: # als trips het hoogste is
+       
+        non_trips_in_hand = [trips[1][0]]
+        for i in range(2):
+            if high_cards[i] != trips[1][0]:
+                non_trips_in_hand.append(high_cards[i])
+            else:
+                non_trips_in_hand.append(high_cards[i+3])
+        return 4, non_trips_in_hand
+
+    elif pairs[0] and len(pairs[1]) >= 2: # als two pair het hoogste is
+        print(high_cards)
+        if high_cards[0] == pairs[1][0] and high_cards[2] == pairs[1][1]:
+            return 3, [pairs[0], pairs[1][1], high_cards[4]]
+        elif high_cards[0] == pairs[1][0] and high_cards[2] != pairs[1][1]:
+            return 3, [pairs[0][0], pairs[1][1], high_cards[2]]
+        else:
+            return 3, [pairs[1][0], pairs[1][1], high_cards[0]]
+
+    elif pairs[0] and len(pairs[1]) == 1: # als single pair het hoogste is
+        non_pairs_in_hand = [pairs[1][0]]
+        for i in range(3):
+            if high_cards[i] != pairs[1][0]:
+                non_pairs_in_hand.append(high_cards[i])
+            else:
+                non_pairs_in_hand.append(high_cards[i+2])
+        return 2, non_pairs_in_hand
+    
+    else: # als high card het hoogste is
+        return 1, high_cards[:5]
+
 
 
 # Example usage
 hand = [
-    Kaart('Harten', 'J'),
-    Kaart('Harten', 'J'),
-    Kaart('Harten', 'A'),
-    Kaart('Harten', 'J'),
-    Kaart('Harten', 'J'),
-    Kaart('Harten', 'A'),
-    Kaart('Harten', 'A')
+    Kaart('Harten', '8'),
+    Kaart('Harten', '9'),
+    Kaart('Harten', 'K'),
+    Kaart('Harten', '3'),
+    Kaart('Harten', 'V'),
+    Kaart('Harten', '6'),
+    Kaart('Harten', '2')
 ]
 
 # beste_full_house()
